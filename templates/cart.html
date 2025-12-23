@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="section-header">
+        <h2>Cart</h2>
+        <a href="/?category=All" class="more-link">Continue Shopping</a>
+    </div>
+
+    {% if items|length == 0 %}
+        <div class="cart-empty">
+            <p>Your cart is empty.</p>
+        </div>
+    {% else %}
+        <div class="cart-table">
+            {% for item in items %}
+                <div class="cart-row">
+                    <div class="cart-product">
+                        <img src="{{ item.image }}" alt="{{ item.name }}" onerror="this.src='https://via.placeholder.com/120x120?text=No+Image'">
+                        <div class="cart-info">
+                            <p class="cart-name">{{ item.name }}</p>
+                            <p class="cart-price">${{ item.price }}</p>
+                        </div>
+                    </div>
+                    <div class="cart-controls">
+                        <form action="/cart/update/{{ item.id }}" method="POST" class="cart-update-form">
+                            <select name="size" class="cart-select">
+                                <option value="S" {% if item.size == 'S' %}selected{% endif %}>S</option>
+                                <option value="M" {% if item.size == 'M' %}selected{% endif %}>M</option>
+                                <option value="L" {% if item.size == 'L' %}selected{% endif %}>L</option>
+                            </select>
+                            <input type="number" name="qty" class="cart-qty" value="{{ item.qty }}" min="1">
+                            <button type="submit" class="btn-outline">Update</button>
+                        </form>
+                        <form action="/cart/remove/{{ item.id }}" method="POST">
+                            <button type="submit" class="btn-danger">Remove</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="cart-summary">
+            <p>Total</p>
+            <span>${{ total }}</span>
+        </div>
+        <button class="btn-black">Checkout</button>
+    {% endif %}
+</div>
+{% endblock %}

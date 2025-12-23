@@ -169,6 +169,209 @@ header {
 
 .btn-black { width: 100%; background: #000; color: #fff; padding: 16px; font-size: 16px; font-weight: 700; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
 .btn-black:hover { background: #333; }
+.btn-danger { width: 100%; background: #ff3b30; color: #fff; padding: 16px; font-size: 16px; font-weight: 700; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+.btn-danger:hover { background: #d92c24; }
+.pet-action-row { display: flex; gap: 10px; }
+.pet-action-row .btn-black { margin-top: 0; }
+.pet-delete-form { margin-top: 10px; }
+
+/* =========================================
+   4-0. 공용 사이즈 선택
+   ========================================= */
+.size-picker { display: flex; gap: 10px; }
+.size-option {
+    flex: 1;
+    border: 1px solid #ddd;
+    background: #fff;
+    padding: 10px 0;
+    border-radius: 8px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.size-option:hover { border-color: #000; }
+.size-option.is-active { background: #000; color: #fff; border-color: #000; }
+.size-selected { display: inline-block; font-size: 12px; color: #666; margin-top: 8px; }
+
+/* =========================================
+   4-0. Cart
+   ========================================= */
+.cart-table { display: flex; flex-direction: column; gap: 18px; margin-top: 20px; }
+.cart-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    background: #fff;
+}
+.cart-product { display: flex; gap: 15px; align-items: center; flex: 1; }
+.cart-product img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; }
+.cart-info { display: flex; flex-direction: column; gap: 6px; }
+.cart-name { font-weight: 800; font-size: 15px; }
+.cart-price { color: #666; font-size: 13px; }
+.cart-controls { display: flex; flex-direction: column; gap: 10px; min-width: 220px; }
+.cart-update-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cart-select, .cart-qty {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 13px;
+}
+.btn-outline {
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.cart-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 25px 0 10px;
+    font-size: 18px;
+    font-weight: 800;
+}
+.cart-empty {
+    border: 1px dashed #ddd;
+    padding: 40px;
+    text-align: center;
+    border-radius: 8px;
+    color: #777;
+}
+.cart-form { flex: 1; }
+.btn-buy { flex: 1; }
+
+/* =========================================
+   4-0. 마이페이지 탭
+   ========================================= */
+.mypage-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+.mypage-tab {
+    flex: 1;
+    border: 1px solid #eee;
+    background: #fff;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: 0.2s;
+}
+.mypage-tab:hover { border-color: #000; }
+.mypage-tab.is-active {
+    background: #000;
+    color: #fff;
+    border-color: #000;
+}
+.mypage-section { display: none; }
+.mypage-section.is-active { display: block; }
+
+/* =========================================
+   4-0. AI 펫 선택 모달
+   ========================================= */
+.pet-select-area { text-align: left; margin: 15px 0 10px; }
+.pet-select-title { font-size: 14px; font-weight: 800; margin-bottom: 10px; }
+.pet-select-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.pet-select-card {
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 10px;
+    background: #fff;
+    cursor: pointer;
+    text-align: center;
+    transition: 0.2s;
+}
+.pet-select-card img {
+    width: 100%;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+    margin-bottom: 8px;
+}
+.pet-select-card:hover { transform: translateY(-3px); border-color: #000; }
+.pet-select-card.is-active { border-color: #000; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+.pet-select-name { display: block; font-weight: 800; font-size: 12px; }
+.pet-select-meta { display: block; font-size: 11px; color: #777; margin-top: 4px; }
+.pet-select-fallback {
+    width: 100%;
+    height: 90px;
+    border-radius: 10px;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 8px;
+}
+.pet-select-warning { color: #ff3b30; font-size: 12px; margin: 10px 0; text-align: center; }
+.pet-select-link { display: inline-block; font-size: 12px; color: #666; text-decoration: underline; margin-top: 10px; }
+
+/* =========================================
+   4-1. 마이페이지 펫 선택
+   ========================================= */
+.pet-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+    margin: 20px 0 30px;
+}
+.pet-card {
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 12px;
+    background: #fff;
+    cursor: pointer;
+    text-align: center;
+    transition: 0.2s;
+}
+.pet-card img {
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+    margin-bottom: 10px;
+}
+.pet-card:hover { transform: translateY(-4px); border-color: #000; }
+.pet-card.is-active { border-color: #000; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+.pet-name { display: block; font-weight: 800; font-size: 13px; }
+.pet-meta { display: block; font-size: 11px; color: #777; margin-top: 4px; }
+.pet-photo-fallback {
+    width: 100%;
+    height: 110px;
+    border-radius: 10px;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    margin-bottom: 10px;
+}
+.pet-card-add {
+    border-style: dashed;
+}
+.pet-add-icon {
+    width: 100%;
+    height: 110px;
+    border-radius: 10px;
+    border: 2px dashed #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: #666;
+    margin-bottom: 10px;
+}
+.pet-panels { margin-top: 10px; }
+.pet-panel { display: none; }
+.pet-panel.is-active { display: block; }
 
 /* =========================================
    5. 상세 페이지

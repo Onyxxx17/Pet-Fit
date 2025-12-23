@@ -29,12 +29,13 @@
 
                 {% if session.user_id %}
                     <span class="welcome-msg">Hello, {{ session.username }}</span>
+                    <a href="/mypage" class="menu-item">My Page</a>
                     <a href="/logout" class="menu-item">Logout</a>
                 {% else %}
                     <a href="/login" class="menu-item">Login</a>
                     <a href="/register" class="menu-item">Register</a>
                 {% endif %}
-                <a href="#" class="menu-item">Cart</a>
+                <a href="/cart" class="menu-item">Cart</a>
             </div>
         </div>
     </header>
@@ -51,6 +52,37 @@
             <div id="loading-spinner" style="display:none; margin: 30px 0;">
                 <div class="spinner"></div>
                 <p style="margin-top:15px; color:#666;">AI is tailoring the outfit for your dog... 🧶</p>
+            </div>
+
+            <div id="pet-select-area" class="pet-select-area" style="display:none;">
+                <p class="pet-select-title">Choose a pet profile</p>
+                <div class="pet-select-grid">
+                    {% for pet in nav_pets %}
+                        <button class="pet-select-card" data-pet-id="{{ pet.id }}" data-has-image="{{ 1 if pet.image else 0 }}" type="button">
+                            {% if pet.image %}
+                                <img src="{{ url_for('static', filename='uploads/' ~ pet.image) }}" alt="Pet photo">
+                            {% else %}
+                                <div class="pet-select-fallback">🐶</div>
+                            {% endif %}
+                            <span class="pet-select-name">{{ pet.name or 'My Pet' }}</span>
+                            <span class="pet-select-meta">{{ pet.breed or '-' }}</span>
+                        </button>
+                    {% endfor %}
+                </div>
+                <div class="pet-select-size">
+                    <p class="pet-select-title" style="margin-top: 12px;">Choose size</p>
+                    <div class="size-picker" id="ai-size-picker">
+                        <button type="button" class="size-option" data-size="S">S</button>
+                        <button type="button" class="size-option is-active" data-size="M">M</button>
+                        <button type="button" class="size-option" data-size="L">L</button>
+                    </div>
+                    <span id="ai-size" class="size-selected">M</span>
+                </div>
+                <p id="pet-select-warning" class="pet-select-warning" style="display:none;">
+                    This profile has no photo. Please update it in My Page.
+                </p>
+                <button id="pet-select-start" class="btn-black">Start AI Fitting</button>
+                <a href="/mypage" class="pet-select-link">Manage profiles</a>
             </div>
 
             <div id="result-area"></div>

@@ -22,10 +22,24 @@
                     🚀 Free Shipping | ✅ Guaranteed Next Day Delivery
                 </p>
             </div>
+            <div class="detail-desc" style="border-top: none; margin-top: -15px;">
+                <p style="font-size: 13px; color: #555; margin-bottom: 8px;">Choose Size</p>
+                <div class="size-picker" id="product-size-picker">
+                    <button type="button" class="size-option" data-size="S">S</button>
+                    <button type="button" class="size-option is-active" data-size="M">M</button>
+                    <button type="button" class="size-option" data-size="L">L</button>
+                </div>
+                <span id="product-size" class="size-selected" data-input-id="cart-size">{{ product.size or 'M' }}</span>
+            </div>
 
             <div class="btn-group">
-                <button class="btn-cart">Add to Cart</button>
-                <button class="btn-buy">Buy Now</button>
+                <form action="/cart/add" method="POST" class="cart-form">
+                    <input type="hidden" name="product_id" value="{{ product.id }}">
+                    <input type="hidden" name="size" id="cart-size" value="{{ product.size or 'M' }}">
+                    <input type="hidden" name="qty" value="1">
+                    <button type="submit" class="btn-cart">Add to Cart</button>
+                </form>
+                <button class="btn-buy" type="button" onclick="location.href='/cart'">Buy Now</button>
             </div>
 
             <div class="ai-section">

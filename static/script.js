@@ -6,6 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeBtn = document.getElementsByClassName('close-btn')[0];
     const loading = document.getElementById('loading-spinner');
     const resultArea = document.getElementById('result-area');
+    const petSelectArea = document.getElementById('pet-select-area');
+    const petSelectCards = document.querySelectorAll('.pet-select-card');
+    const petSelectStartBtn = document.getElementById('pet-select-start');
+    const petSelectWarning = document.getElementById('pet-select-warning');
+    const productSizePicker = document.getElementById('product-size-picker');
+    const productSizeDisplay = document.getElementById('product-size');
+    const aiSizePicker = document.getElementById('ai-size-picker');
+    const aiSizeDisplay = document.getElementById('ai-size');
+    let selectedPetId = null;
+    let selectedPetHasImage = false;
     
     // 모달 내부 요소
     const uploadPrompt = document.getElementById('upload-prompt');
@@ -17,13 +27,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. 모달 열기 함수
     function openModal() {
         modal.style.display = "block";
-        // 상품 상세페이지가 아니면 기본 이미지나 안내를 보여줄 수도 있음
-        // 여기서는 기존 로직대로 요청 시도 (로그인/프로필 체크를 위해)
-        if(document.getElementById('product-img')) {
-             requestAIFitting();
+        resultArea.innerHTML = "";
+        loading.style.display = "none";
+        uploadPrompt.style.display = "none";
+
+        if (petSelectArea && petSelectCards.length > 0) {
+            petSelectArea.style.display = "block";
+            if (!selectedPetId && petSelectCards[0]) {
+                petSelectCards[0].click();
+            }
         } else {
-            // 메인에서 눌렀을 때의 처리 (예: 임의의 상품이나 안내)
-            // 현재는 간단히 프로필 체크만 수행하도록 함
             uploadPrompt.style.display = 'block';
         }
     }
@@ -50,6 +63,9 @@ document.addEventListener('DOMContentLoaded', () => {
         resultArea.innerHTML = ''; 
         uploadPrompt.style.display = "none"; 
         loading.style.display = "none";
+        if (petSelectArea) {
+            petSelectArea.style.display = "none";
+        }
     }
 
     // 5. 'Start' 버튼 클릭 (정보 입력 후)
@@ -71,10 +87,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    if (petSelectCards.length > 0) {
+        petSelectCards.forEach(card => {
+            card.addEventListener('click', () => {
+                petSelectCards.forEach(c => c.classList.remove('is-active'));
+                card.classList.add('is-active');
+                selectedPetId = card.dataset.petId;
+                selectedPetHasImage = card.dataset.hasImage === "1";
+                if (petSelectWarning) {
+                    petSelectWarning.style.display = selectedPetHasImage ? "none" : "block";
+                }
+            });
+        });
+    }
+
     // AI 요청 함수
-    function requestAIFitting(file = null, breed = null, size = null) {
+    function requestAIFitting(file = null, breed = null, size = null, petId = null) {
         loading.style.display = "block";
         uploadPrompt.style.display = "none";
+        if (petSelectArea) {
+            petSelectArea.style.display = "none";
+        }
         resultArea.innerHTML = "";
 
         const formData = new FormData();
@@ -82,13 +115,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // 상세 페이지가 아닌 경우 예외처리 필요할 수 있음
         const productImgTag = document.getElementById('product-img');
         const productNameTag = document.getElementById('product-name');
+        const productSizeTag = document.getElementById('product-size');
+        const aiSizeTag = document.getElementById('ai-size');
         
         if(productImgTag) formData.append('product_image_url', productImgTag.src);
         if(productNameTag) formData.append('product_name', productNameTag.innerText);
+        const fitSize = aiSizeTag && aiSizeTag.textContent ? aiSizeTag.textContent : (productSizeTag ? productSizeTag.innerText : null);
+        if(fitSize) formData.append('product_size', fitSize);
         
         if (file) formData.append('user_image', file);
         if (breed) formData.append('pet_breed', breed);
         if (size) formData.append('pet_size', size);
+        if (petId) formData.append('pet_id', petId);
 
         fetch('/api/fit_clothing', {
             method: 'POST',
@@ -137,6 +175,51 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(err);
             loading.style.display = "none";
             alert('An error occurred during AI processing.');
+        });
+    }
+
+    function setupSizePicker(pickerEl, displayEl) {
+        if (!pickerEl || !displayEl) return;
+        const options = pickerEl.querySelectorAll('.size-option');
+        const initialSize = displayEl.textContent.trim();
+        if (initialSize) {
+            options.forEach(option => {
+                option.classList.toggle('is-active', option.dataset.size === initialSize);
+            });
+        }
+        options.forEach(option => {
+            option.addEventListener('click', () => {
+                options.forEach(btn => btn.classList.remove('is-active'));
+                option.classList.add('is-active');
+                displayEl.textContent = option.dataset.size;
+                const inputId = displayEl.dataset.inputId;
+                if (inputId) {
+                    const hiddenInput = document.getElementById(inputId);
+                    if (hiddenInput) {
+                        hiddenInput.value = option.dataset.size;
+                    }
+                }
+            });
+        });
+    }
+
+    setupSizePicker(productSizePicker, productSizeDisplay);
+    setupSizePicker(aiSizePicker, aiSizeDisplay);
+
+    if (petSelectStartBtn) {
+        petSelectStartBtn.addEventListener('click', () => {
+            if (!selectedPetId) {
+                alert("Please select a pet profile.");
+                return;
+            }
+            if (!selectedPetHasImage) {
+                alert("Selected profile has no photo. Please update it in My Page.");
+                return;
+            }
+            if (aiSizeDisplay) {
+                aiSizeDisplay.textContent = aiSizeDisplay.textContent || "M";
+            }
+            requestAIFitting(null, null, null, selectedPetId);
         });
     }
 

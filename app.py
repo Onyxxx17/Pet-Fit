@@ -12,6 +12,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from google import genai
 from google.genai import types
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 app = Flask(__name__)
 app.secret_key = 'your_secret_key' 
 
@@ -20,12 +26,12 @@ app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-NAVER_CLIENT_ID = "Js36ALdCTg6fZ8v8T78g"
-NAVER_CLIENT_SECRET = "vsvGv1iGyZ"
-GOOGLE_API_KEY = "google api"
+NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID");
+NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 gemini_client = None
-if "AIza" in GOOGLE_API_KEY:
+if GOOGLE_API_KEY:
     try:
         gemini_client = genai.Client(api_key=GOOGLE_API_KEY)
         print(">>> Gemini Client Initialized.")
@@ -51,7 +57,7 @@ def classify_product(title):
 
 #Query changed to Korean ("강아지 옷") for Naver API accuracy
 def fetch_naver_api_products(query="강아지 옷", display=20):
-    if "Here" in NAVER_CLIENT_ID:
+    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET or "Here" in NAVER_CLIENT_ID:
         return []
     url = "https://openapi.naver.com/v1/search/shop.json"
     headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
@@ -62,6 +68,7 @@ def fetch_naver_api_products(query="강아지 옷", display=20):
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             items = response.json().get('items', [])
+            sizes = ['S', 'M', 'L']
             for item in items:
                 try:
                     raw_title = item['title']
@@ -82,8 +89,9 @@ def fetch_naver_api_products(query="강아지 옷", display=20):
                     if usd_price < 1: usd_price = 1
                     
                     category = classify_product(eng_title)
+                    size = sizes[len(clean_title) % 3]
                     description = "High-quality K-Pet fashion item sourced directly from Korea."
-                    products.append((eng_title, usd_price, eng_brand, category, image_url, description))
+                    products.append((eng_title, usd_price, eng_brand, category, size, image_url, description))
                 except: continue
     except: pass
     return products
@@ -92,14 +100,42 @@ def init_db():
     conn = sqlite3.connect('petshop.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, pet_name TEXT, pet_breed TEXT, pet_size TEXT, pet_image TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS pets (id INTEGER PRIMARY KEY, user_id INTEGER, name TEXT, breed TEXT, size TEXT, image TEXT, created_at INTEGER)''')
     c.execute('''CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price INTEGER, brand TEXT, category TEXT, image TEXT, description TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS cart_items (id INTEGER PRIMARY KEY, user_id INTEGER, product_id INTEGER, size TEXT, qty INTEGER, created_at INTEGER)''')
+    c.execute('PRAGMA table_info(products)')
+    product_columns = [row[1] for row in c.fetchall()]
+    if 'size' not in product_columns:
+        c.execute('ALTER TABLE products ADD COLUMN size TEXT')
+    c.execute('PRAGMA table_info(users)')
+    user_columns = [row[1] for row in c.fetchall()]
+    if 'email' not in user_columns:
+        c.execute('ALTER TABLE users ADD COLUMN email TEXT')
     c.execute('SELECT count(*) FROM products')
     if c.fetchone()[0] == 0:
         # [Modified] Using Korean query for initialization
         api_data = fetch_naver_api_products("강아지 옷", display=20)
         if api_data:
-            c.executemany('INSERT INTO products (name, price, brand, category, image, description) VALUES (?,?,?,?,?,?)', api_data)
+            c.executemany(
+                'INSERT INTO products (name, price, brand, category, size, image, description) VALUES (?,?,?,?,?,?,?)',
+                api_data
+            )
             conn.commit()
+    c.execute('UPDATE products SET size = ? WHERE size IS NULL OR size = ""', ('M',))
+
+    # One-time migration: copy existing user pet profiles into pets table.
+    c.execute('SELECT id, pet_name, pet_breed, pet_size, pet_image FROM users')
+    users = c.fetchall()
+    for user in users:
+        user_id, pet_name, pet_breed, pet_size, pet_image = user
+        if any([pet_name, pet_breed, pet_size, pet_image]):
+            c.execute('SELECT count(*) FROM pets WHERE user_id = ?', (user_id,))
+            if c.fetchone()[0] == 0:
+                c.execute(
+                    'INSERT INTO pets (user_id, name, breed, size, image, created_at) VALUES (?,?,?,?,?,?)',
+                    (user_id, pet_name, pet_breed, pet_size, pet_image, int(time.time()))
+                )
+    conn.commit()
     conn.close()
 
 init_db()
@@ -110,6 +146,46 @@ def get_db():
         db = g._database = sqlite3.connect('petshop.db')
         db.row_factory = sqlite3.Row
     return db
+
+def normalize_pet_size(size_text):
+    if not size_text:
+        return None
+    match = re.search(r'(\d+(?:\.\d+)?)', size_text)
+    if match:
+        weight = float(match.group(1))
+        if weight < 3:
+            return 'S'
+        if weight < 7:
+            return 'M'
+        return 'L'
+    size_text = size_text.upper()
+    if 'S' in size_text:
+        return 'S'
+    if 'M' in size_text:
+        return 'M'
+    if 'L' in size_text:
+        return 'L'
+    return None
+
+def size_prompt_hint(size_bucket):
+    if size_bucket == 'S':
+        return "The clothing should look snug and compact."
+    if size_bucket == 'M':
+        return "The clothing should look balanced and true-to-size."
+    if size_bucket == 'L':
+        return "The clothing should look roomier with a relaxed fit."
+    return ""
+
+@app.context_processor
+def inject_nav_pets():
+    if 'user_id' not in session:
+        return {'nav_pets': []}
+    db = get_db()
+    pets = db.execute(
+        'SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC, id DESC',
+        (session['user_id'],)
+    ).fetchall()
+    return {'nav_pets': pets}
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -145,8 +221,16 @@ def register():
                 pet_image_filename = filename
 
         db = get_db()
-        db.execute('INSERT INTO users (username, password, pet_name, pet_breed, pet_size, pet_image) VALUES (?, ?, ?, ?, ?, ?)',
-                   (username, password, pet_name, pet_breed, pet_size, pet_image_filename))
+        cursor = db.execute(
+            'INSERT INTO users (username, password, pet_name, pet_breed, pet_size, pet_image) VALUES (?, ?, ?, ?, ?, ?)',
+            (username, password, pet_name, pet_breed, pet_size, pet_image_filename)
+        )
+        user_id = cursor.lastrowid
+        if any([pet_name, pet_breed, pet_size, pet_image_filename]):
+            db.execute(
+                'INSERT INTO pets (user_id, name, breed, size, image, created_at) VALUES (?,?,?,?,?,?)',
+                (user_id, pet_name, pet_breed, pet_size, pet_image_filename, int(time.time()))
+            )
         db.commit()
         return redirect(url_for('login'))
     return render_template('register.html')
@@ -171,11 +255,244 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+@app.route('/mypage')
+def mypage():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db()
+    user = db.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    if user is None:
+        session.clear()
+        return redirect(url_for('login'))
+
+    pets = db.execute(
+        'SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC, id DESC',
+        (session['user_id'],)
+    ).fetchall()
+
+    return render_template('mypage.html', user=user, pets=pets)
+
+@app.route('/account/update', methods=['POST'])
+def update_account():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    email = request.form.get('email')
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    db = get_db()
+    user = db.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    if user is None:
+        session.clear()
+        return redirect(url_for('login'))
+
+    if email is not None and email.strip() != '':
+        db.execute('UPDATE users SET email = ? WHERE id = ?', (email.strip(), session['user_id']))
+
+    if current_password and new_password and confirm_password:
+        if new_password == confirm_password and check_password_hash(user['password'], current_password):
+            new_hash = generate_password_hash(new_password)
+            db.execute('UPDATE users SET password = ? WHERE id = ?', (new_hash, session['user_id']))
+
+    db.commit()
+    return redirect(url_for('mypage'))
+
+@app.route('/pets/add', methods=['POST'])
+def add_pet():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    pet_name = request.form.get('pet_name')
+    pet_breed = request.form.get('pet_breed')
+    pet_size = request.form.get('pet_size')
+    pet_image_filename = None
+
+    if 'pet_image' in request.files:
+        file = request.files['pet_image']
+        if file and file.filename != '':
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            pet_image_filename = filename
+
+    if not pet_image_filename:
+        return redirect(url_for('mypage'))
+
+    if not any([pet_name, pet_breed, pet_size, pet_image_filename]):
+        return redirect(url_for('mypage'))
+
+    db = get_db()
+    db.execute(
+        'INSERT INTO pets (user_id, name, breed, size, image, created_at) VALUES (?,?,?,?,?,?)',
+        (session['user_id'], pet_name, pet_breed, pet_size, pet_image_filename, int(time.time()))
+    )
+    db.commit()
+    return redirect(url_for('mypage'))
+
+@app.route('/pets/update/<int:pet_id>', methods=['POST'])
+def update_pet(pet_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    pet_name = request.form.get('pet_name')
+    pet_breed = request.form.get('pet_breed')
+    pet_size = request.form.get('pet_size')
+    pet_image_filename = None
+
+    if 'pet_image' in request.files:
+        file = request.files['pet_image']
+        if file and file.filename != '':
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            pet_image_filename = filename
+
+    db = get_db()
+    pet = db.execute(
+        'SELECT * FROM pets WHERE id = ? AND user_id = ?',
+        (pet_id, session['user_id'])
+    ).fetchone()
+    if pet is None:
+        return redirect(url_for('mypage'))
+
+    update_fields = []
+    update_params = []
+    if pet_name is not None:
+        update_fields.append('name = ?')
+        update_params.append(pet_name)
+    if pet_breed is not None:
+        update_fields.append('breed = ?')
+        update_params.append(pet_breed)
+    if pet_size is not None:
+        update_fields.append('size = ?')
+        update_params.append(pet_size)
+    if pet_image_filename:
+        update_fields.append('image = ?')
+        update_params.append(pet_image_filename)
+
+    if update_fields:
+        update_params.extend([pet_id, session['user_id']])
+        db.execute(
+            f'UPDATE pets SET {", ".join(update_fields)} WHERE id = ? AND user_id = ?',
+            tuple(update_params)
+        )
+        db.commit()
+
+    return redirect(url_for('mypage'))
+
+@app.route('/pets/delete/<int:pet_id>', methods=['POST'])
+def delete_pet(pet_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db()
+    db.execute(
+        'DELETE FROM pets WHERE id = ? AND user_id = ?',
+        (pet_id, session['user_id'])
+    )
+    db.commit()
+    return redirect(url_for('mypage'))
+
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
     db = get_db()
     product = db.execute('SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
     return render_template('detail.html', product=product)
+
+@app.route('/cart')
+def cart():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db()
+    items = db.execute(
+        '''
+        SELECT c.id, c.size, c.qty, p.id AS product_id, p.name, p.price, p.image
+        FROM cart_items c
+        JOIN products p ON c.product_id = p.id
+        WHERE c.user_id = ?
+        ORDER BY c.created_at DESC, c.id DESC
+        ''',
+        (session['user_id'],)
+    ).fetchall()
+
+    total = sum(item['price'] * item['qty'] for item in items)
+    return render_template('cart.html', items=items, total=total)
+
+@app.route('/cart/add', methods=['POST'])
+def cart_add():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    product_id = request.form.get('product_id')
+    size = request.form.get('size', 'M').strip().upper()
+    qty = request.form.get('qty', '1')
+
+    try:
+        qty = max(1, int(qty))
+    except Exception:
+        qty = 1
+
+    if not product_id:
+        return redirect(url_for('cart'))
+
+    db = get_db()
+    product = db.execute('SELECT id FROM products WHERE id = ?', (product_id,)).fetchone()
+    if product is None:
+        return redirect(url_for('cart'))
+
+    existing = db.execute(
+        'SELECT id, qty FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?',
+        (session['user_id'], product_id, size)
+    ).fetchone()
+
+    if existing:
+        db.execute(
+            'UPDATE cart_items SET qty = ? WHERE id = ?',
+            (existing['qty'] + qty, existing['id'])
+        )
+    else:
+        db.execute(
+            'INSERT INTO cart_items (user_id, product_id, size, qty, created_at) VALUES (?,?,?,?,?)',
+            (session['user_id'], product_id, size, qty, int(time.time()))
+        )
+    db.commit()
+    return redirect(url_for('cart'))
+
+@app.route('/cart/update/<int:item_id>', methods=['POST'])
+def cart_update(item_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    size = request.form.get('size', 'M').strip().upper()
+    qty = request.form.get('qty', '1')
+
+    try:
+        qty = max(1, int(qty))
+    except Exception:
+        qty = 1
+
+    db = get_db()
+    db.execute(
+        'UPDATE cart_items SET size = ?, qty = ? WHERE id = ? AND user_id = ?',
+        (size, qty, item_id, session['user_id'])
+    )
+    db.commit()
+    return redirect(url_for('cart'))
+
+@app.route('/cart/remove/<int:item_id>', methods=['POST'])
+def cart_remove(item_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    db = get_db()
+    db.execute(
+        'DELETE FROM cart_items WHERE id = ? AND user_id = ?',
+        (item_id, session['user_id'])
+    )
+    db.commit()
+    return redirect(url_for('cart'))
 
 @app.route('/api/fit_clothing', methods=['POST'])
 def fit_clothing():
@@ -187,43 +504,56 @@ def fit_clothing():
     
     product_name = request.form.get('product_name', 'Stylish Dog Clothes')
     product_image_url = request.form.get('product_image_url') 
+    product_size = request.form.get('product_size')
     
+    selected_pet_id = request.form.get('pet_id')
+    new_name = request.form.get('pet_name')
     new_breed = request.form.get('pet_breed')
     new_size = request.form.get('pet_size')
     new_image_file = request.files.get('user_image')
 
-    update_query = "UPDATE users SET "
-    update_params = []
-    
-    if new_breed:
-        update_query += "pet_breed = ?, "
-        update_params.append(new_breed)
-    if new_size:
-        update_query += "pet_size = ?, "
-        update_params.append(new_size)
+    new_image_filename = None
     if new_image_file and new_image_file.filename != '':
         filename = secure_filename(new_image_file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         new_image_file.save(file_path)
-        update_query += "pet_image = ?, "
-        update_params.append(filename)
-        session['pet_image'] = filename 
-        
-    if update_params:
-        update_query = update_query.rstrip(', ') + " WHERE id = ?"
-        update_params.append(user_id)
-        try:
-            db.execute(update_query, tuple(update_params))
-            db.commit()
-        except Exception as e:
-            print(f">>> DB Update Error: {e}")
+        new_image_filename = filename
 
-    user = db.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
-    if user is None or not user['pet_image']:
+    pet = None
+    if selected_pet_id:
+        pet = db.execute(
+            'SELECT * FROM pets WHERE id = ? AND user_id = ?',
+            (selected_pet_id, user_id)
+        ).fetchone()
+    elif any([new_name, new_breed, new_size, new_image_filename]):
+        db.execute(
+            'INSERT INTO pets (user_id, name, breed, size, image, created_at) VALUES (?,?,?,?,?,?)',
+            (user_id, new_name, new_breed, new_size, new_image_filename, int(time.time()))
+        )
+        db.commit()
+        pet = db.execute(
+            'SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+            (user_id,)
+        ).fetchone()
+    else:
+        pet = db.execute(
+            'SELECT * FROM pets WHERE user_id = ? AND image IS NOT NULL AND image != "" ORDER BY created_at DESC, id DESC LIMIT 1',
+            (user_id,)
+        ).fetchone()
+        if pet is None:
+            pet = db.execute(
+                'SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+                (user_id,)
+            ).fetchone()
+
+    if pet is None or not pet['image']:
         return jsonify({'error': 'no_image', 'message': 'Pet profile or image missing.'}), 400
 
-    pet_breed = user['pet_breed'] if user['pet_breed'] else 'Dog'
-    pet_image_filename = user['pet_image']
+    pet_breed = pet['breed'] if pet['breed'] else 'Dog'
+    pet_size = pet['size']
+    pet_image_filename = pet['image']
+    pet_size_bucket = normalize_pet_size(pet_size) if pet_size else None
+    product_size_bucket = product_size.strip().upper() if product_size else None
 
     print(f">>> Multimodal Request: Breed={pet_breed}, Product={product_name}")
     generated_image_url = None
@@ -237,10 +567,19 @@ def fit_clothing():
             product_response = requests.get(product_image_url)
             product_image_data = product_response.content
 
+            size_context = []
+            if pet_size_bucket:
+                size_context.append(f"pet size {pet_size_bucket}")
+            if product_size_bucket:
+                size_context.append(f"clothing size {product_size_bucket}")
+            size_line = f" The fitting should reflect {', '.join(size_context)}." if size_context else ""
+            fit_hint = size_prompt_hint(product_size_bucket)
+            fit_line = f" {fit_hint}" if fit_hint else ""
+
             prompt_text = (
                 f"Based on the provided images, create a realistic photograph of the {pet_breed} dog "
-                f"wearing the clothing item shown in the product image. "
-                "The dog should be in a natural pose. High quality, detailed texture."
+                f"wearing the clothing item shown in the product image."
+                f"{size_line}{fit_line} The dog should be in a natural pose. High quality, detailed texture."
             )
 
             contents = [

@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="form-container">
+    <h2>My Page</h2>
+    <div class="mypage-tabs">
+        <button class="mypage-tab is-active" data-target="account-section" type="button">Account</button>
+        <button class="mypage-tab" data-target="pet-section" type="button">My Pets</button>
+    </div>
+
+    <div class="mypage-section is-active" id="account-section">
+        <div class="form-section">
+            <h3>Account Details</h3>
+            <div class="input-group">
+                <label class="input-label">Username</label>
+                <div class="input-field" style="background:#f9f9f9; cursor: default;">{{ user.username }}</div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Update Account</h3>
+            <p class="form-desc">Update your email or change your password.</p>
+            <form action="/account/update" method="POST">
+                <div class="input-group">
+                    <label class="input-label">Email</label>
+                    <input type="email" name="email" class="input-field" value="{{ user.email or '' }}" placeholder="you@example.com">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Current Password</label>
+                    <input type="password" name="current_password" class="input-field" placeholder="Enter current password">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">New Password</label>
+                    <input type="password" name="new_password" class="input-field" placeholder="Enter new password">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Confirm New Password</label>
+                    <input type="password" name="confirm_password" class="input-field" placeholder="Confirm new password">
+                </div>
+                <button type="submit" class="btn-black">Update Account</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="mypage-section" id="pet-section">
+        <div class="form-section">
+            <h3>Pet Profiles</h3>
+            {% if pets|length == 0 %}
+                <p class="form-desc">No pet profiles yet. Add one below to start AI fitting.</p>
+            {% endif %}
+
+            <div class="pet-selector">
+                {% for pet in pets %}
+                    <button class="pet-card" data-target="pet-panel-{{ pet.id }}" type="button">
+                        {% if pet.image %}
+                            <img src="{{ url_for('static', filename='uploads/' ~ pet.image) }}" alt="Pet photo">
+                        {% else %}
+                            <div class="pet-photo-fallback">🐶</div>
+                        {% endif %}
+                        <span class="pet-name">{{ pet.name or 'My Pet' }}</span>
+                        <span class="pet-meta">{{ pet.breed or '-' }}</span>
+                    </button>
+                {% endfor %}
+                <button class="pet-card pet-card-add" data-target="pet-panel-add" type="button">
+                    <div class="pet-add-icon">+</div>
+                    <span class="pet-name">Add Pet</span>
+                    <span class="pet-meta">New profile</span>
+                </button>
+            </div>
+
+            <div class="pet-panels">
+                {% for pet in pets %}
+                    <div class="pet-panel" id="pet-panel-{{ pet.id }}">
+                        <div class="input-group">
+                            <label class="input-label">{{ pet.name or 'My Pet' }}</label>
+                            <div class="input-field" style="background:#f9f9f9; cursor: default;">
+                                Breed: {{ pet.breed or '-' }} | Size: {{ pet.size or '-' }}
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            {% if pet.image %}
+                                <img src="{{ url_for('static', filename='uploads/' ~ pet.image) }}" alt="Pet photo" style="width:100%; border-radius:8px; border:1px solid #eee; margin-bottom: 15px;">
+                            {% else %}
+                                <div class="input-field" style="background:#f9f9f9; cursor: default; margin-bottom: 15px;">No photo uploaded</div>
+                            {% endif %}
+                        </div>
+                        <form action="/pets/update/{{ pet.id }}" method="POST" enctype="multipart/form-data">
+                            <div class="input-group">
+                                <label class="input-label">Update Pet Name</label>
+                                <input type="text" name="pet_name" class="input-field" value="{{ pet.name or '' }}">
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <div class="input-group" style="flex: 1;">
+                                    <label class="input-label">Update Breed</label>
+                                    <input type="text" name="pet_breed" class="input-field" value="{{ pet.breed or '' }}">
+                                </div>
+                                <div class="input-group" style="flex: 1;">
+                                    <label class="input-label">Update Size/Weight</label>
+                                    <input type="text" name="pet_size" class="input-field" value="{{ pet.size or '' }}">
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Update Photo (Optional)</label>
+                                <div class="file-upload-wrapper">
+                                    <input type="file" name="pet_image" id="pet-update-{{ pet.id }}" class="file-upload-input" accept="image/*">
+                                    <label for="pet-update-{{ pet.id }}" class="file-upload-label">
+                                        📸 Select Photo (Click)
+                                    </label>
+                                </div>
+                            </div>
+                        <div class="pet-action-row">
+                            <button type="submit" class="btn-black">Update Pet Profile</button>
+                        </div>
+                    </form>
+                    <form action="/pets/delete/{{ pet.id }}" method="POST" onsubmit="return confirm('Delete this pet profile?');" class="pet-delete-form">
+                        <button type="submit" class="btn-danger">Delete</button>
+                    </form>
+                </div>
+            {% endfor %}
+
+                <div class="pet-panel" id="pet-panel-add">
+                    <form action="/pets/add" method="POST" enctype="multipart/form-data">
+                        <div class="input-group">
+                            <label class="input-label">Pet Name</label>
+                            <input type="text" name="pet_name" class="input-field" placeholder="e.g. Fluffy">
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <div class="input-group" style="flex: 1;">
+                                <label class="input-label">Breed</label>
+                                <input type="text" name="pet_breed" class="input-field" placeholder="e.g. Bichon">
+                            </div>
+                            <div class="input-group" style="flex: 1;">
+                                <label class="input-label">Size/Weight</label>
+                                <input type="text" name="pet_size" class="input-field" placeholder="e.g. 3kg">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Full Body Photo</label>
+                            <div class="file-upload-wrapper">
+                                <input type="file" name="pet_image" id="mypage-file-upload" class="file-upload-input" accept="image/*" required>
+                                <label for="mypage-file-upload" class="file-upload-label">
+                                    📸 Select Photo (Click)
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-black">Add Pet Profile</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const cards = document.querySelectorAll('.pet-card');
+        const panels = document.querySelectorAll('.pet-panel');
+        const tabs = document.querySelectorAll('.mypage-tab');
+        const sections = document.querySelectorAll('.mypage-section');
+
+        function selectSection(targetId) {
+            sections.forEach(section => {
+                section.classList.toggle('is-active', section.id === targetId);
+            });
+            tabs.forEach(tab => {
+                tab.classList.toggle('is-active', tab.dataset.target === targetId);
+            });
+        }
+
+        function selectPanel(targetId) {
+            panels.forEach(panel => {
+                panel.classList.toggle('is-active', panel.id === targetId);
+            });
+            cards.forEach(card => {
+                card.classList.toggle('is-active', card.dataset.target === targetId);
+            });
+        }
+
+        if (tabs.length > 0) {
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    selectSection(tab.dataset.target);
+                });
+            });
+        }
+
+        if (cards.length > 0) {
+            const defaultTarget = cards[0].dataset.target;
+            selectPanel(defaultTarget);
+        }
+
+        cards.forEach(card => {
+            card.addEventListener('click', () => {
+                selectPanel(card.dataset.target);
+            });
+        });
+    });
+</script>
+{% endblock %}
