@@ -818,22 +818,83 @@ def product_detail(product_id):
     cur.execute("SELECT * FROM products WHERE id = %s", (product_id,))
     product = cur.fetchone()
     
+    recommended_size = None
+    user_pets = []
+    selected_pet = None
+    
     if product:
         product['price'] = product['base_price_cents'] / 100
         
-        # Get sizes
+        # Get sizes with proper ordering
         cur.execute("""
             SELECT * FROM product_sizes 
             WHERE product_id = %s 
-            ORDER BY label
+            ORDER BY 
+                CASE label
+                    WHEN 'XXS' THEN 1
+                    WHEN 'XS' THEN 2
+                    WHEN 'S' THEN 3
+                    WHEN 'M' THEN 4
+                    WHEN 'L' THEN 5
+                    WHEN 'XL' THEN 6
+                    WHEN 'XXL' THEN 7
+                    ELSE 8
+                END
         """, (product_id,))
         sizes = cur.fetchall()
         product['sizes'] = sizes
+        
+        # Get all user's pets
+        if 'user_id' in session:
+            cur.execute("""
+                SELECT p.*, b.name as breed_name, b.avg_weight_kg, b.avg_chest_cm, b.avg_back_cm, b.avg_neck_cm
+                FROM pets p
+                LEFT JOIN breeds b ON p.breed_id = b.id
+                WHERE p.user_id = %s
+                ORDER BY p.created_at DESC
+            """, (session['user_id'],))
+            user_pets = cur.fetchall()
+            
+            # Check if pet_id is in query params for recommendation
+            pet_id = request.args.get('pet_id')
+            
+            if pet_id:
+                selected_pet = next((p for p in user_pets if p['id'] == int(pet_id)), None)
+            elif len(user_pets) == 1:
+                # Auto-select if only one pet
+                selected_pet = user_pets[0]
+            
+            # Calculate recommended size if pet selected
+            if selected_pet and sizes:
+                dimensions = get_pet_estimated_dimensions(selected_pet, selected_pet)
+                
+                best_size = None
+                min_diff = float('inf')
+                
+                for size in sizes:
+                    # Check weight range first
+                    if selected_pet.get('weight_kg'):
+                        if size.get('weight_min_kg') and size.get('weight_max_kg'):
+                            if size['weight_min_kg'] <= selected_pet['weight_kg'] <= size['weight_max_kg']:
+                                best_size = size['label']
+                                break
+                    
+                    # Otherwise check dimension match
+                    chest_diff = abs(dimensions['chest_cm'] - float(size['chest_cm'])) if dimensions.get('chest_cm') else 999
+                    back_diff = abs(dimensions['back_cm'] - float(size['back_cm'])) if dimensions.get('back_cm') else 999
+                    total_diff = chest_diff + back_diff
+                    
+                    if total_diff < min_diff:
+                        min_diff = total_diff
+                        best_size = size['label']
+                
+                recommended_size = best_size
     
     cur.close()
     conn.close()
     
-    return render_template('detail.html', product=product)
+    return render_template('detail.html', product=product, recommended_size=recommended_size, 
+                         user_pets=user_pets, selected_pet=selected_pet)
 
 
 @app.route('/api/fit_clothing', methods=['POST'])
@@ -855,18 +916,19 @@ def fit_clothing():
     cur.execute("SELECT * FROM pets WHERE id = %s AND user_id = %s", (pet_id, session['user_id']))
     pet = cur.fetchone()
     
-    if not pet or not pet.get('image_url'):
+    if not pet or not pet.get('image_data'):
+        cur.close()
+        conn.close()
         return jsonify({'error': 'Pet image required'}), 400
     
-    pet_image_path = os.path.join(app.config['UPLOAD_FOLDER'], pet['image_url'].replace('/static/uploads/', ''))
+    # Get pet image data from database
+    pet_image_data = bytes(pet['image_data'])
     
     generated_image_url = None
     
     if gemini_client and product_image_url:
         try:
-            with open(pet_image_path, "rb") as f:
-                pet_image_data = f.read()
-            
+            # Download product image
             product_response = requests.get(product_image_url, timeout=10)
             product_image_data = product_response.content
             
@@ -877,7 +939,7 @@ def fit_clothing():
             
             contents = [
                 prompt_text,
-                types.Part.from_bytes(data=pet_image_data, mime_type="image/jpeg"),
+                types.Part.from_bytes(data=pet_image_data, mime_type=pet.get('image_mime_type', 'image/jpeg')),
                 types.Part.from_bytes(data=product_image_data, mime_type="image/jpeg")
             ]
             
@@ -896,7 +958,7 @@ def fit_clothing():
                         if isinstance(image_bytes, str):
                             image_bytes = base64.b64decode(image_bytes)
                         
-                        unique_filename = f"gemini_{uuid.uuid4().hex[:8]}.png"
+                        unique_filename = f"gemini_{uuid.uuid4().hex[:8]}.jpg"
                         save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
                         
                         with open(save_path, "wb") as f:
@@ -998,8 +1060,33 @@ def cart():
         flash('Please log in to view your cart.')
         return redirect(url_for('login'))
     
-    # Get cart items from session (simple cart implementation)
+    # Get cart items from session
     cart_items = session.get('cart', [])
+    
+    # Fetch available sizes for each product
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    for item in cart_items:
+        cur.execute("""
+            SELECT label FROM product_sizes 
+            WHERE product_id = %s 
+            ORDER BY 
+                CASE label
+                    WHEN 'XXS' THEN 1
+                    WHEN 'XS' THEN 2
+                    WHEN 'S' THEN 3
+                    WHEN 'M' THEN 4
+                    WHEN 'L' THEN 5
+                    WHEN 'XL' THEN 6
+                    WHEN 'XXL' THEN 7
+                    ELSE 8
+                END
+        """, (item['id'],))
+        item['available_sizes'] = [s['label'] for s in cur.fetchall()]
+    
+    cur.close()
+    conn.close()
     
     # Calculate total
     total = sum(item.get('price', 0) * item.get('qty', 1) for item in cart_items)
@@ -1019,7 +1106,7 @@ def add_to_cart(product_id):
     
     # Get product details
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("""
         SELECT id, name, base_price_cents 
         FROM products 

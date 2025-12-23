@@ -23,18 +23,45 @@
                 </p>
             </div>
             <div class="detail-desc" style="border-top: none; margin-top: -15px;">
-                <p style="font-size: 13px; color: #555; margin-bottom: 8px;">Choose Size</p>
-                <div class="size-picker" id="product-size-picker">
-                    <button type="button" class="size-option" data-size="S">S</button>
-                    <button type="button" class="size-option is-active" data-size="M">M</button>
-                    <button type="button" class="size-option" data-size="L">L</button>
+                {% if user_pets|length > 1 %}
+                <div style="background: #fff3cd; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+                    <p style="font-size: 13px; color: #856404; margin-bottom: 8px;">
+                        🐕 Choose pet for size recommendation:
+                    </p>
+                    <select onchange="window.location.href='/product/{{ product.id }}?pet_id=' + this.value" style="padding: 8px; border-radius: 4px; border: 1px solid #ddd; width: 100%;">
+                        <option value="">Select a pet...</option>
+                        {% for pet in user_pets %}
+                        <option value="{{ pet.id }}" {% if selected_pet and pet.id == selected_pet.id %}selected{% endif %}>{{ pet.name }} - {{ pet.breed_name or 'Unknown breed' }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <span id="product-size" class="size-selected" data-input-id="cart-size">{{ product.size or 'M' }}</span>
+                {% endif %}
+                
+                <p style="font-size: 13px; color: #555; margin-bottom: 8px;">
+                    Choose Size
+                    {% if recommended_size and selected_pet %}
+                    <span style="color: #4CAF50; font-weight: 600; margin-left: 8px;">✓ Recommended for {{ selected_pet.name }}: {{ recommended_size }}</span>
+                    {% endif %}
+                </p>
+                <div class="size-picker" id="product-size-picker">
+                    {% if product.sizes %}
+                        {% for size in product.sizes %}
+                            <button type="button" class="size-option{% if size.label == recommended_size %} is-active{% elif not recommended_size and size.label == 'M' %} is-active{% endif %}" data-size="{{ size.label }}">
+                                {{ size.label }}
+                            </button>
+                        {% endfor %}
+                    {% else %}
+                        <button type="button" class="size-option" data-size="S">S</button>
+                        <button type="button" class="size-option is-active" data-size="M">M</button>
+                        <button type="button" class="size-option" data-size="L">L</button>
+                    {% endif %}
+                </div>
+                <span id="product-size" class="size-selected" data-input-id="cart-size">{{ recommended_size or product.size or 'M' }}</span>
             </div>
 
             <div class="btn-group">
                 <form action="/cart/add/{{ product.id }}" method="POST" class="cart-form">
-                    <input type="hidden" name="size" id="cart-size" value="{{ product.size or 'M' }}">
+                    <input type="hidden" name="size" id="cart-size" value="{{ recommended_size or product.size or 'M' }}">
                     <input type="hidden" name="qty" value="1">
                     <button type="submit" class="btn-cart">Add to Cart</button>
                 </form>
@@ -42,12 +69,107 @@
             </div>
 
             <div class="ai-section">
-                <button id="ai-btn" class="btn-ai">
-                    🤖 Try AI Virtual Fitting
+                {% if user_pets|length == 0 %}
+                <p style="color: #888; font-size: 13px;">Add a pet profile to try AI virtual fitting</p>
+                {% elif user_pets|length == 1 %}
+                <button type="button" class="btn-ai" onclick="tryAIFitting({{ user_pets[0].id }})">
+                    🤖 Try AI Virtual Fitting with {{ user_pets[0].name }}
                 </button>
                 <p class="ai-msg">🔮 Try it on your dog with AI!</p>
+                {% else %}
+                <button type="button" class="btn-ai" onclick="showPetSelector()">
+                    🤖 Try AI Virtual Fitting
+                </button>
+                <p class="ai-msg">🔮 Choose a pet to try it on!</p>
+                <div id="pet-selector-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+                    <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; width: 90%;">
+                        <h3 style="margin-bottom: 16px;">Choose a pet for AI fitting:</h3>
+                        {% for pet in user_pets %}
+                        <div onclick="tryAIFitting({{ pet.id }})" style="padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; gap: 12px;">
+                            {% if pet.image_data %}
+                            <img src="/pet_image/{{ pet.id }}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                            {% endif %}
+                            <div>
+                                <strong>{{ pet.name }}</strong><br>
+                                <small style="color: #888;">{{ pet.breed_name or 'Unknown breed' }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <button onclick="closePetSelector()" style="margin-top: 12px; padding: 8px 16px; background: #ddd; border: none; border-radius: 4px; cursor: pointer; width: 100%;">Cancel</button>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function showPetSelector() {
+    document.getElementById('pet-selector-modal').style.display = 'flex';
+}
+
+function closePetSelector() {
+    document.getElementById('pet-selector-modal').style.display = 'none';
+}
+
+function tryAIFitting(petId) {
+    if (document.getElementById('pet-selector-modal')) {
+        closePetSelector();
+    }
+    
+    // Show loading state
+    const aiBtns = document.querySelectorAll('.btn-ai');
+    aiBtns.forEach(btn => {
+        btn.innerHTML = '⏳ Generating AI image...';
+        btn.disabled = true;
+    });
+    
+    // Get product info
+    const productName = document.getElementById('product-name').textContent;
+    const productImageUrl = document.getElementById('product-img').src;
+    
+    // Call the AI fitting API
+    const formData = new FormData();
+    formData.append('pet_id', petId);
+    formData.append('product_name', productName);
+    formData.append('product_image_url', productImageUrl);
+    
+    fetch('/api/fit_clothing', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.result_image) {
+            // Show result in a modal or replace product image temporarily
+            const resultModal = document.createElement('div');
+            resultModal.style = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: flex; align-items: center; justify-content: center;';
+            resultModal.innerHTML = `
+                <div style="background: white; padding: 24px; border-radius: 12px; max-width: 600px; text-align: center;">
+                    <h3 style="margin-bottom: 16px;">🤖 AI Virtual Try-On Result</h3>
+                    <img src="${data.result_image}" style="max-width: 100%; border-radius: 8px; margin-bottom: 16px;">
+                    <button onclick="this.closest('div').parentElement.remove()" style="padding: 12px 24px; background: #000; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+                </div>
+            `;
+            document.body.appendChild(resultModal);
+        } else {
+            alert('AI fitting failed. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error generating AI image. Please try again.');
+    })
+    .finally(() => {
+        aiBtns.forEach(btn => {
+            btn.innerHTML = '🤖 Try AI Virtual Fitting';
+            btn.disabled = false;
+        });
+    });
+    
+    // Prevent the old modal from opening
+    return false;
+}
+</script>
 {% endblock %}

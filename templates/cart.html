@@ -25,9 +25,15 @@
                     <div class="cart-controls">
                         <form action="/cart/update/{{ item.id }}" method="POST" class="cart-update-form">
                             <select name="size" class="cart-select">
-                                <option value="S" {% if item.size == 'S' %}selected{% endif %}>S</option>
-                                <option value="M" {% if item.size == 'M' %}selected{% endif %}>M</option>
-                                <option value="L" {% if item.size == 'L' %}selected{% endif %}>L</option>
+                                {% if item.available_sizes %}
+                                    {% for size in item.available_sizes %}
+                                    <option value="{{ size }}" {% if item.size == size %}selected{% endif %}>{{ size }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="S" {% if item.size == 'S' %}selected{% endif %}>S</option>
+                                    <option value="M" {% if item.size == 'M' %}selected{% endif %}>M</option>
+                                    <option value="L" {% if item.size == 'L' %}selected{% endif %}>L</option>
+                                {% endif %}
                             </select>
                             <input type="number" name="qty" class="cart-qty" value="{{ item.qty }}" min="1">
                             <button type="submit" class="btn-outline">Update</button>
