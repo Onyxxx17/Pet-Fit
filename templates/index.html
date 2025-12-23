@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="hero-banner">
+    <div class="hero-content">
+        <span class="hero-subtitle">2025 NEW COLLECTION</span>
+        <h1>For Your Dog's<br>Special Day</h1>
+        <p>Experience failure-free shopping with AI fitting.</p>
+        <button class="btn-hero" onclick="location.href='/?category=All'">SHOP NOW &rarr;</button>
+    </div>
+</section>
+
+<div class="container">
+    <div class="category-shortcut">
+        <a href="/" class="cat-item">
+            <div class="cat-icon">🏠</div>
+            <span>All</span>
+        </a>
+        <a href="/?category=Top" class="cat-item">
+            <div class="cat-icon">👕</div>
+            <span>Tops</span>
+        </a>
+        <a href="/?category=Outer" class="cat-item">
+            <div class="cat-icon">🧥</div>
+            <span>Outerwear</span>
+        </a>
+        <a href="/?category=Dress" class="cat-item">
+            <div class="cat-icon">👗</div>
+            <span>Dresses</span>
+        </a>
+        <a href="/?category=All-in-one" class="cat-item">
+            <div class="cat-icon">🧸</div>
+            <span>All-in-one</span>
+        </a>
+        <a href="/?category=Etc" class="cat-item">
+            <div class="cat-icon">🦺</div>
+            <span>Functional</span>
+        </a>
+        <a href="/?category=Accessory" class="cat-item">
+            <div class="cat-icon">🧢</div>
+            <span>Hats</span>
+        </a>
+    </div>
+
+    <div class="section-header">
+        <h2>
+            {% if current_category %}
+                {{ current_category }} Collection 🧥
+            {% else %}
+                Weekly Best 🏆
+            {% endif %}
+        </h2>
+        <a href="/?category=All" class="more-link">View All</a>
+    </div>
+    
+    <div class="product-grid">
+        {% if products|length == 0 %}
+            <p style="grid-column: 1 / -1; text-align: center; padding: 50px;">
+                No products found in this category. 🐶
+            </p>
+        {% else %}
+            {% for product in products %}
+            <div class="product-card" onclick="location.href='/product/{{ product.id }}'">
+                <div class="img-box">
+                    <img src="{{ product.image }}" alt="{{ product.name }}" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image'">
+                    <div class="rank-badge">{{ loop.index }}</div>
+                </div>
+                <div class="info-box">
+                    <span class="brand">{{ product.brand }}</span>
+                    <p class="name">{{ product.name }}</p>
+                    <div class="price-row">
+                        <span class="price-amount" data-usd="{{ product.price }}">${{ product.price }}</span>
+                        <span class="sale-badge">SALE</span>
+                    </div>
+                    <p class="delivery-tag">🚀 Next Day Delivery</p>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

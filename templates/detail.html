@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container" style="margin-top: 50px;">
+    <div class="detail-wrapper">
+        <div class="detail-image">
+            <img src="{{ product.image }}" id="product-img" alt="{{ product.name }}" onerror="this.src='https://via.placeholder.com/500x500?text=No+Image'">
+        </div>
+
+        <div class="detail-info">
+            <div class="info-header">
+                <span class="detail-brand">{{ product.brand }}</span>
+                <h1 class="detail-title" id="product-name">{{ product.name }}</h1>
+                <p class="detail-price">
+                    <span class="price-amount" data-usd="{{ product.price }}">${{ product.price }}</span>
+                </p>
+            </div>
+
+            <div class="detail-desc">
+                <p>{{ product.description }}</p>
+                <p style="margin-top: 10px; color: #888; font-size: 13px;">
+                    🚀 Free Shipping | ✅ Guaranteed Next Day Delivery
+                </p>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-cart">Add to Cart</button>
+                <button class="btn-buy">Buy Now</button>
+            </div>
+
+            <div class="ai-section">
+                <button id="ai-btn" class="btn-ai">
+                    🤖 Try AI Virtual Fitting
+                </button>
+                <p class="ai-msg">🔮 Try it on your dog with AI!</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

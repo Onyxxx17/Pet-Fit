@@ -1,0 +1,266 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap');
+
+/* =========================================
+   1. 기본 설정 (Reset & Common)
+   ========================================= */
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
+body { color: #000; background-color: #fff; line-height: 1.6; }
+a { text-decoration: none; color: inherit; transition: 0.2s; }
+ul { list-style: none; }
+button { outline: none; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 40px 20px; }
+
+/* =========================================
+   2. 헤더 (Header)
+   ========================================= */
+header {
+    border-bottom: 1px solid #e5e5e5;
+    position: sticky; top: 0; background: #fff; z-index: 999;
+    height: 70px; display: flex; align-items: center;
+}
+.header-inner {
+    width: 100%; max-width: 1400px; margin: 0 auto; padding: 0 20px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.logo a { font-size: 24px; font-weight: 900; font-style: italic; letter-spacing: -1px; }
+
+.main-nav ul { display: flex; gap: 30px; }
+.main-nav a { font-size: 16px; font-weight: 700; color: #000; }
+.main-nav a:hover { opacity: 0.5; }
+.highlight a { color: #ff3b30; }
+
+.user-menu { display: flex; align-items: center; gap: 20px; font-size: 13px; font-weight: 500; }
+.menu-item { color: #555; }
+.menu-item:hover { color: #000; }
+.welcome-msg { font-weight: 700; }
+
+/* =========================================
+   3. 메인 페이지 (Main Page)
+   ========================================= */
+.hero-banner {
+    width: 100%; height: 450px;
+    background: url('https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=2000&auto=format&fit=crop') no-repeat center center/cover;
+    display: flex; align-items: center; justify-content: flex-start;
+    position: relative;
+}
+.hero-banner::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 100%);
+}
+.hero-content {
+    position: relative; z-index: 2; color: #fff;
+    max-width: 1400px; margin: 0 auto; padding: 0 40px; width: 100%;
+}
+.hero-subtitle { font-size: 14px; font-weight: 700; letter-spacing: 2px; color: #ccc; margin-bottom: 10px; display: block; }
+.hero-content h1 { font-size: 48px; font-weight: 900; line-height: 1.2; margin-bottom: 20px; }
+.btn-hero {
+    padding: 15px 40px; background: #fff; color: #000;
+    border: none; font-weight: 700; cursor: pointer; transition: 0.3s;
+    margin-top: 20px; font-size: 14px;
+}
+.btn-hero:hover { background: #000; color: #fff; }
+
+.category-shortcut {
+    display: flex; justify-content: center; gap: 30px; margin-bottom: 60px;
+    border-bottom: 1px solid #eee; padding-bottom: 40px;
+    flex-wrap: wrap; 
+}
+.cat-item { 
+    text-align: center; cursor: pointer; transition: 0.2s; min-width: 80px;
+    display: block; color: inherit; text-decoration: none;
+}
+.cat-item:hover { transform: translateY(-5px); }
+.cat-icon { 
+    width: 60px; height: 60px; background: #f5f5f5; border-radius: 50%; 
+    display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto 10px;
+}
+.cat-item span { font-size: 14px; font-weight: 600; }
+
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.section-header h2 { font-size: 22px; font-weight: 800; }
+.more-link { font-size: 13px; color: #888; text-decoration: underline; }
+
+.product-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
+    gap: 20px; 
+    width: 100%;
+}
+
+.product-card { 
+    cursor: pointer; 
+    transition: transform 0.2s;
+}
+.product-card:hover { 
+    transform: translateY(-5px); 
+}
+
+.img-box { 
+    position: relative; 
+    width: 100%;
+    aspect-ratio: 1 / 1; 
+    overflow: hidden; 
+    border-radius: 8px; 
+    background: #f0f0f0; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.img-box img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    object-position: center; 
+    transition: transform 0.3s; 
+    display: block;
+}
+.product-card:hover .img-box img { 
+    transform: scale(1.05); 
+}
+
+.rank-badge {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(0,0,0,0.8); color: #fff; width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; border-radius: 50%;
+    z-index: 2;
+}
+
+.info-box { padding: 12px 5px; }
+.brand { font-size: 12px; color: #999; font-weight: 700; margin-bottom: 4px; display: block; }
+.name { 
+    font-size: 15px; margin-bottom: 8px; color: #333;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; 
+}
+.price-row { display: flex; align-items: center; gap: 8px; }
+.price-amount { font-size: 18px; font-weight: 800; }
+.sale-badge { font-size: 10px; color: #ff3b30; font-weight: 700; background: #ffebeb; padding: 2px 4px; border-radius: 2px; }
+.delivery-tag { font-size: 11px; color: #007aff; margin-top: 5px; font-weight: 500; }
+
+/* =========================================
+   4. 폼 스타일
+   ========================================= */
+.form-container { 
+    max-width: 480px; margin: 80px auto; padding: 40px; 
+    border: 1px solid #eee; border-radius: 8px; background: #fff; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+}
+.form-container h2 { text-align: center; font-size: 28px; margin-bottom: 30px; letter-spacing: -0.5px; }
+.form-section { margin-bottom: 30px; }
+.form-section h3 { font-size: 16px; margin-bottom: 15px; color: #333; border-left: 4px solid #000; padding-left: 10px; }
+.form-desc { font-size: 13px; color: #888; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 4px; }
+
+.input-group { margin-bottom: 15px; }
+.input-label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 5px; color: #444; }
+.input-field { 
+    width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 4px; 
+    font-size: 14px; transition: border-color 0.2s; outline: none;
+}
+.input-field:focus { border-color: #000; }
+
+.file-upload-wrapper { position: relative; margin-top: 10px; }
+.file-upload-label {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; padding: 14px; background: #f5f5f5; border: 1px dashed #ccc;
+    border-radius: 4px; cursor: pointer; color: #666; font-size: 14px; transition: 0.3s;
+}
+.file-upload-label:hover { background: #eee; border-color: #999; color: #333; }
+.file-upload-input { display: none; }
+
+.btn-black { width: 100%; background: #000; color: #fff; padding: 16px; font-size: 16px; font-weight: 700; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+.btn-black:hover { background: #333; }
+
+/* =========================================
+   5. 상세 페이지
+   ========================================= */
+.detail-wrapper {
+    display: flex; gap: 50px; align-items: flex-start; padding-bottom: 80px; margin-top: 50px;
+}
+.detail-image {
+    flex: 1.5; border-radius: 8px; overflow: hidden; background-color: #f9f9f9;
+}
+.detail-image img { width: 100%; height: auto; display: block; object-fit: cover; }
+
+.detail-info { flex: 1; padding-top: 10px; }
+.detail-brand { font-size: 14px; font-weight: 700; color: #555; text-decoration: underline; margin-bottom: 5px; display: block; }
+.detail-title { font-size: 28px; margin-bottom: 15px; font-weight: 400; }
+.detail-price { font-size: 24px; font-weight: 800; margin-bottom: 30px; }
+.detail-desc { 
+    border-top: 1px solid #eee; border-bottom: 1px solid #eee; 
+    padding: 20px 0; margin-bottom: 30px; color: #444; 
+}
+
+.btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
+.btn-cart {
+    flex: 1; padding: 18px; border: 1px solid #ddd; background: #fff;
+    color: #333; font-weight: 700; cursor: pointer; border-radius: 4px;
+    font-size: 15px; transition: 0.2s;
+}
+.btn-cart:hover { border-color: #000; color: #000; }
+.btn-buy {
+    flex: 1; padding: 18px; border: none; background: #000;
+    color: #fff; font-weight: 700; cursor: pointer; border-radius: 4px;
+    font-size: 15px; transition: 0.2s;
+}
+.btn-buy:hover { background: #333; }
+
+.btn-ai {
+    width: 100%; padding: 18px; border: none; border-radius: 4px;
+    background: linear-gradient(96deg, #7b2cbf, #3a86ff);
+    color: #fff; font-weight: 700; font-size: 16px; cursor: pointer;
+    box-shadow: 0 4px 15px rgba(123, 44, 191, 0.3);
+    transition: transform 0.2s;
+}
+.btn-ai:hover { transform: scale(1.02); }
+.ai-msg { text-align: center; font-size: 12px; color: #7b2cbf; margin-top: 8px; font-weight: 600; }
+
+/* =========================================
+   6. 모달 & 푸터 & 반응형
+   ========================================= */
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+.modal-content { 
+    background-color: #fefefe; margin: 5% auto; padding: 40px; 
+    border: none; width: 50%; max-width: 600px; text-align: center; border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+.close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+.spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 20px auto; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+#result-area img { max-width: 100%; margin-top: 20px; border-radius: 8px; }
+
+footer { border-top: 1px solid #eee; padding: 40px 0; margin-top: 50px; color: #888; font-size: 12px; }
+.footer-inner { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+.footer-logo { font-weight: 900; color: #000; font-size: 16px; margin-bottom: 10px; }
+
+@media (max-width: 1024px) {
+    .hero-content h1 { font-size: 32px; }
+}
+@media (max-width: 768px) {
+    .detail-wrapper { flex-direction: column; gap: 30px; }
+    .hero-banner { height: 350px; }
+    .modal-content { width: 90%; }
+}
+
+/* [Added] Currency Button Style */
+.btn-currency {
+    background: transparent;
+    border: 1px solid #ddd;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+    margin-right: 15px;
+}
+
+.btn-currency:hover {
+    background: #f5f5f5;
+    border-color: #000;
+}
+
+.btn-currency.active {
+    background: #000;
+    color: #fff;
+    border-color: #000;
+}

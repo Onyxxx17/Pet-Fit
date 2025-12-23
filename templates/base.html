@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PETINSA - Global Pet Fashion</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <div class="logo">
+                <a href="/">PETINSA</a>
+            </div>
+            
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="/?category=All">All</a></li>
+                    <li><a href="/?category=Top">Tops</a></li>
+                    <li><a href="/?category=Outer">Outerwear</a></li>
+                    <li><a href="/?category=Dress">Dresses</a></li>
+                    <li class="highlight"><a href="#" id="ai-btn-nav">AI Fitting 🔥</a></li>
+                </ul>
+            </nav>
+
+            <div class="user-menu">
+                <button id="currency-toggle" class="btn-currency">$ USD</button>
+
+                {% if session.user_id %}
+                    <span class="welcome-msg">Hello, {{ session.username }}</span>
+                    <a href="/logout" class="menu-item">Logout</a>
+                {% else %}
+                    <a href="/login" class="menu-item">Login</a>
+                    <a href="/register" class="menu-item">Register</a>
+                {% endif %}
+                <a href="#" class="menu-item">Cart</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    
+    <div id="ai-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3>AI Virtual Fitting</h3>
+            
+            <div id="loading-spinner" style="display:none; margin: 30px 0;">
+                <div class="spinner"></div>
+                <p style="margin-top:15px; color:#666;">AI is tailoring the outfit for your dog... 🧶</p>
+            </div>
+
+            <div id="result-area"></div>
+            
+            <div id="upload-prompt" style="display:none; margin-top: 20px; text-align: left; background: #f9f9f9; padding: 25px; border-radius: 8px;">
+                <p style="text-align: center; margin-bottom: 10px; font-weight: bold; color: #ff3b30; font-size: 16px;">
+                    🚨 Pet Profile Required!
+                </p>
+                <p style="font-size: 13px; color: #666; margin-bottom: 20px; text-align: center;">
+                    Please register your dog's info to start AI fitting.<br>(It will be saved automatically!)
+                </p>
+
+                <div class="input-group">
+                    <label class="input-label">Dog Breed (Required)</label>
+                    <input type="text" id="modal-breed" class="input-field" placeholder="e.g. Bichon, Poodle" style="width:100%; padding:10px; margin-bottom:15px;">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Size</label>
+                    <input type="text" id="modal-size" class="input-field" placeholder="S, M, L" style="width:100%; padding:10px; margin-bottom:15px;">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">Dog Photo</label>
+                    <input type="file" id="modal-file" class="input-field" accept="image/*" style="width:100%; padding:10px;">
+                </div>
+
+                <button id="modal-submit-btn" class="btn-black" style="margin-top:15px; width:100%;">Save & Start Fitting ✨</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-inner">
+            <p class="footer-logo">PETINSA</p>
+            <p>Copyright © 2025 PETINSA All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
