@@ -22,7 +22,7 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 
 NAVER_CLIENT_ID = "Js36ALdCTg6fZ8v8T78g"
 NAVER_CLIENT_SECRET = "vsvGv1iGyZ"
-GOOGLE_API_KEY = "AIzaSyD0TeYaSnX6M4M6nMLjaSZq6ZTfF3n7Zz4"
+GOOGLE_API_KEY = "google api"
 
 gemini_client = None
 if "AIza" in GOOGLE_API_KEY:
@@ -49,7 +49,7 @@ def classify_product(title):
     else:
         return 'Etc'
 
-# [Modified] Query changed to Korean ("강아지 옷") for Naver API accuracy
+#Query changed to Korean ("강아지 옷") for Naver API accuracy
 def fetch_naver_api_products(query="강아지 옷", display=20):
     if "Here" in NAVER_CLIENT_ID:
         return []
@@ -250,7 +250,7 @@ def fit_clothing():
             ]
 
             response = gemini_client.models.generate_content(
-                model='gemini-2.0-flash', 
+                model='gemini-3-pro-image-preview', 
                 contents=contents,
                 config=types.GenerateContentConfig(
                     response_modalities=["TEXT", "IMAGE"]
