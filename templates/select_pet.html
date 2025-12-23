@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 3rem auto; padding: 0 1rem;">
+    <h1 style="text-align: center; margin-bottom: 1rem;">Get Recommendations</h1>
+    <p style="text-align: center; color: #666; margin-bottom: 3rem;">
+        Select which pet you'd like personalized product recommendations for
+    </p>
+    
+    <div class="pet-grid" style="display: grid; gap: 1.5rem;">
+        {% for pet in pets %}
+        <form action="/recommendations" method="POST" style="margin: 0;">
+            <input type="hidden" name="pet_id" value="{{ pet.id }}">
+            <button type="submit" class="pet-card" style="width: 100%; text-align: left; padding: 1.5rem; border: 2px solid #e0e0e0; border-radius: 12px; background: white; cursor: pointer; display: flex; align-items: center; gap: 1.5rem; transition: all 0.2s;">
+                {% if pet.image_data %}
+                <img src="/pet_image/{{ pet.id }}" alt="{{ pet.name }}" 
+                     style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #f0f0f0;">
+                {% else %}
+                <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 2rem;">
+                    🐕
+                </div>
+                {% endif %}
+                
+                <div style="flex: 1;">
+                    <div style="font-weight: bold; font-size: 1.3rem; margin-bottom: 0.5rem;">{{ pet.name }}</div>
+                    <div style="color: #666; font-size: 1rem;">
+                        <span style="display: inline-block; background: #f0f0f0; padding: 0.25rem 0.75rem; border-radius: 4px; margin-right: 0.5rem;">
+                            {{ pet.breed_name or 'Mixed Breed' }}
+                        </span>
+                        {% if pet.weight_kg %}
+                        <span style="display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 0.25rem 0.75rem; border-radius: 4px; margin-right: 0.5rem;">
+                            {{ pet.weight_kg }} kg
+                        </span>
+                        {% endif %}
+                        {% if pet.size_label %}
+                        <span style="display: inline-block; background: #e3f2fd; color: #1565c0; padding: 0.25rem 0.75rem; border-radius: 4px;">
+                            Size {{ pet.size_label }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div style="font-size: 1.5rem; color: #666;">→</div>
+            </button>
+        </form>
+        {% endfor %}
+    </div>
+    
+    <div style="text-align: center; margin-top: 3rem;">
+        <a href="/mypage" style="color: #666; text-decoration: none; font-size: 0.9rem;">
+            ← Back to My Page
+        </a>
+    </div>
+</div>
+
+<style>
+.pet-card:hover {
+    border-color: #333 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+</style>
+{% endblock %}

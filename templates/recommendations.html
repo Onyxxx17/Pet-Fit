@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container" style="max-width: 1200px; margin: 2rem auto; padding: 0 1rem;">
+    
+    <h1 style="text-align: center; margin-bottom: 2rem;">Recommendations for Your Pet</h1>
+    
+    <!-- Pet Selection (if multiple pets) -->
+    {% if pets and pets|length > 1 and not selected_pet %}
+    <div class="pet-selection" style="max-width: 600px; margin: 2rem auto;">
+        <h2>Select a Pet</h2>
+        <p style="color: #666; margin-bottom: 1.5rem;">Which pet would you like recommendations for?</p>
+        
+        <div class="pet-grid" style="display: grid; gap: 1rem;">
+            {% for pet in pets %}
+            <form action="/recommendations" method="POST" style="margin: 0;">
+                <input type="hidden" name="pet_id" value="{{ pet.id }}">
+                <button type="submit" class="pet-card" style="width: 100%; text-align: left; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; display: flex; align-items: center; gap: 1rem;">
+                    {% if pet.image_data %}
+                    <img src="/pet_image/{{ pet.id }}" alt="{{ pet.name }}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
+                    {% else %}
+                    <div style="width: 60px; height: 60px; border-radius: 50%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🐕</div>
+                    {% endif %}
+                    <div>
+                        <div style="font-weight: bold; font-size: 1.1rem;">{{ pet.name }}</div>
+                        <div style="color: #666; font-size: 0.9rem;">
+                            {{ pet.breed_name or 'Mixed Breed' }} 
+                            {% if pet.weight_kg %}({{ pet.weight_kg }} kg){% endif %}
+                        </div>
+                    </div>
+                </button>
+            </form>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Recommendations Display -->
+    {% if selected_pet and recommendations %}
+    <div class="recommendation-header" style="text-align: center; margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px;">
+        <h2 style="margin: 0 0 0.5rem 0;">Personalized for {{ selected_pet.name }}</h2>
+        <p style="color: #666; margin: 0;">
+            {{ selected_pet.breed_name or 'Mixed Breed' }} 
+            {% if selected_pet.weight_kg %}• {{ selected_pet.weight_kg }} kg{% endif %}
+            {% if selected_pet.size_label %}• Size {{ selected_pet.size_label }}{% endif %}
+        </p>
+        <p style="margin-top: 1rem; font-size: 0.9rem; color: #888;">
+            Using our score-based recommendation algorithm:<br>
+            55% Fit • 20% Weather • 15% Style • 5% Price • 5% Popularity
+        </p>
+    </div>
+    
+    <div class="recommendations-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+        {% for rec in recommendations %}
+        <div class="recommendation-card" style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <a href="/product/{{ rec.product_id }}" style="text-decoration: none; color: inherit;">
+                <div class="product-image" style="position: relative; padding-top: 100%; background: #f5f5f5; overflow: hidden;">
+                    <img src="/product_image/{{ rec.product_id }}" alt="{{ rec.name }}" 
+                         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;">
+                    <div class="score-badge" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 0.5rem 0.75rem; border-radius: 20px; font-weight: bold;">
+                        Match: {{ (rec.total_score * 100)|round|int }}%
+                    </div>
+                </div>
+                
+                <div class="product-info" style="padding: 1.5rem;">
+                    <h3 style="margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">{{ rec.name }}</h3>
+                    <p style="color: #666; font-size: 0.9rem; margin: 0 0 0.75rem 0;">{{ rec.brand }}</p>
+                    
+                    <div class="size-price" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <span style="background: #f0f0f0; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.9rem;">
+                            Size {{ rec.size_label }}
+                        </span>
+                        <span style="font-size: 1.25rem; font-weight: bold; color: #333;">
+                            ${{ "%.2f"|format(rec.price) }}
+                        </span>
+                    </div>
+                    
+                    <div class="fit-info" style="background: #f8f9fa; padding: 0.75rem; border-radius: 6px; font-size: 0.85rem;">
+                        <div style="margin-bottom: 0.25rem;"><strong>Recommended Size:</strong></div>
+                        <div style="color: #666;">
+                            Chest: {{ rec.chest_cm|round(1) }} cm • 
+                            Back: {{ rec.back_cm|round(1) }} cm
+                            {% if rec.neck_cm %}• Neck: {{ rec.neck_cm|round(1) }} cm{% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="score-breakdown" style="margin-top: 1rem; font-size: 0.8rem; color: #888;">
+                        <div style="margin-bottom: 0.25rem;"><strong>Score Breakdown:</strong></div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.25rem;">
+                            <div>Fit: {{ (rec.fit_score * 100)|round|int }}%</div>
+                            <div>Weather: {{ (rec.weather_score * 100)|round|int }}%</div>
+                            <div>Style: {{ (rec.style_score * 100)|round|int }}%</div>
+                            <div>Price: {{ (rec.price_score * 100)|round|int }}%</div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div style="text-align: center; margin-top: 2rem;">
+        <a href="/mypage" class="btn-black" style="display: inline-block; padding: 0.75rem 2rem; background: #333; color: white; text-decoration: none; border-radius: 4px;">
+            Back to My Page
+        </a>
+        {% if pets and pets|length > 1 %}
+        <a href="/recommendations" class="btn-outline" style="display: inline-block; padding: 0.75rem 2rem; border: 1px solid #333; color: #333; text-decoration: none; border-radius: 4px; margin-left: 1rem;">
+            Choose Different Pet
+        </a>
+        {% endif %}
+    </div>
+    
+    {% elif selected_pet and not recommendations %}
+    <div style="text-align: center; padding: 3rem; background: #f8f9fa; border-radius: 8px;">
+        <h2>No Products Available Yet</h2>
+        <p style="color: #666; margin: 1rem 0;">We don't have any products in the database yet.</p>
+        <p style="color: #888; font-size: 0.9rem;">Admin can fetch products using the /admin/fetch_products endpoint</p>
+        <a href="/mypage" class="btn-black" style="display: inline-block; margin-top: 1rem; padding: 0.75rem 2rem; background: #333; color: white; text-decoration: none; border-radius: 4px;">
+            Back to My Page
+        </a>
+    </div>
+    {% elif not pets %}
+    <div style="text-align: center; padding: 3rem; background: #f8f9fa; border-radius: 8px;">
+        <h2>No Pets Yet</h2>
+        <p style="color: #666; margin: 1rem 0;">Create a pet profile to get personalized recommendations!</p>
+        <a href="/pets/add" class="btn-black" style="display: inline-block; margin-top: 1rem; padding: 0.75rem 2rem; background: #333; color: white; text-decoration: none; border-radius: 4px;">
+            Add Your First Pet
+        </a>
+    </div>
+    {% endif %}
+    
+</div>
+
+<style>
+.pet-card:hover {
+    background: #f8f9fa !important;
+    border-color: #333 !important;
+}
+
+.recommendation-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.recommendation-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15) !important;
+}
+
+.btn-black {
+    transition: background 0.2s;
+}
+
+.btn-black:hover {
+    background: #555 !important;
+}
+
+.btn-outline {
+    transition: all 0.2s;
+}
+
+.btn-outline:hover {
+    background: #333 !important;
+    color: white !important;
+}
+</style>
+{% endblock %}

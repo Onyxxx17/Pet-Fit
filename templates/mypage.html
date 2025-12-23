@@ -46,26 +46,32 @@
         <div class="form-section">
             <h3>Pet Profiles</h3>
             {% if pets|length == 0 %}
-                <p class="form-desc">No pet profiles yet. Add one below to start AI fitting.</p>
+                <p class="form-desc">No pet profiles yet. Add one to get personalized recommendations!</p>
+            {% else %}
+                <p class="form-desc">
+                    <a href="/recommendations" class="btn-black" style="display: inline-block; padding: 0.75rem 1.5rem; text-decoration: none; margin-bottom: 1rem;">
+                        🎯 Get Recommendations
+                    </a>
+                </p>
             {% endif %}
 
             <div class="pet-selector">
                 {% for pet in pets %}
                     <button class="pet-card" data-target="pet-panel-{{ pet.id }}" type="button">
-                        {% if pet.image %}
-                            <img src="{{ url_for('static', filename='uploads/' ~ pet.image) }}" alt="Pet photo">
+                        {% if pet.image_data %}
+                            <img src="/pet_image/{{ pet.id }}" alt="Pet photo">
                         {% else %}
                             <div class="pet-photo-fallback">🐶</div>
                         {% endif %}
                         <span class="pet-name">{{ pet.name or 'My Pet' }}</span>
-                        <span class="pet-meta">{{ pet.breed or '-' }}</span>
+                        <span class="pet-meta">{{ pet.breed_name or '-' }}</span>
                     </button>
                 {% endfor %}
-                <button class="pet-card pet-card-add" data-target="pet-panel-add" type="button">
+                <a href="/pets/add" class="pet-card pet-card-add" style="text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <div class="pet-add-icon">+</div>
                     <span class="pet-name">Add Pet</span>
                     <span class="pet-meta">New profile</span>
-                </button>
+                </a>
             </div>
 
             <div class="pet-panels">
@@ -74,12 +80,13 @@
                         <div class="input-group">
                             <label class="input-label">{{ pet.name or 'My Pet' }}</label>
                             <div class="input-field" style="background:#f9f9f9; cursor: default;">
-                                Breed: {{ pet.breed or '-' }} | Size: {{ pet.size or '-' }}
+                                Breed: {{ pet.breed_name or '-' }} | Size: {{ pet.size_label or '-' }}
+                                {% if pet.weight_kg %} | Weight: {{ pet.weight_kg }} kg{% endif %}
                             </div>
                         </div>
                         <div class="input-group">
-                            {% if pet.image %}
-                                <img src="{{ url_for('static', filename='uploads/' ~ pet.image) }}" alt="Pet photo" style="width:100%; border-radius:8px; border:1px solid #eee; margin-bottom: 15px;">
+                            {% if pet.image_data %}
+                                <img src="/pet_image/{{ pet.id }}" alt="Pet photo" style="width:100%; border-radius:8px; border:1px solid #eee; margin-bottom: 15px;">
                             {% else %}
                                 <div class="input-field" style="background:#f9f9f9; cursor: default; margin-bottom: 15px;">No photo uploaded</div>
                             {% endif %}
@@ -89,14 +96,29 @@
                                 <label class="input-label">Update Pet Name</label>
                                 <input type="text" name="pet_name" class="input-field" value="{{ pet.name or '' }}">
                             </div>
+                            <div class="input-group">
+                                <label class="input-label">Update Breed</label>
+                                <select name="breed_id" class="input-field">
+                                    <option value="">Unknown Breed</option>
+                                    <!-- Breeds will need to be passed or fetched -->
+                                </select>
+                            </div>
                             <div style="display: flex; gap: 10px;">
                                 <div class="input-group" style="flex: 1;">
-                                    <label class="input-label">Update Breed</label>
-                                    <input type="text" name="pet_breed" class="input-field" value="{{ pet.breed or '' }}">
+                                    <label class="input-label">Weight (kg)</label>
+                                    <input type="number" step="0.1" name="weight_kg" class="input-field" value="{{ pet.weight_kg or '' }}" placeholder="e.g., 5.5">
                                 </div>
                                 <div class="input-group" style="flex: 1;">
-                                    <label class="input-label">Update Size/Weight</label>
-                                    <input type="text" name="pet_size" class="input-field" value="{{ pet.size or '' }}">
+                                    <label class="input-label">Size</label>
+                                    <select name="pet_size" class="input-field">
+                                        <option value="">Auto</option>
+                                        <option value="XS" {% if pet.size_label == 'XS' %}selected{% endif %}>XS</option>
+                                        <option value="S" {% if pet.size_label == 'S' %}selected{% endif %}>S</option>
+                                        <option value="M" {% if pet.size_label == 'M' %}selected{% endif %}>M</option>
+                                        <option value="L" {% if pet.size_label == 'L' %}selected{% endif %}>L</option>
+                                        <option value="XL" {% if pet.size_label == 'XL' %}selected{% endif %}>XL</option>
+                                        <option value="XXL" {% if pet.size_label == 'XXL' %}selected{% endif %}>XXL</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="input-group">
@@ -117,35 +139,6 @@
                     </form>
                 </div>
             {% endfor %}
-
-                <div class="pet-panel" id="pet-panel-add">
-                    <form action="/pets/add" method="POST" enctype="multipart/form-data">
-                        <div class="input-group">
-                            <label class="input-label">Pet Name</label>
-                            <input type="text" name="pet_name" class="input-field" placeholder="e.g. Fluffy">
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <div class="input-group" style="flex: 1;">
-                                <label class="input-label">Breed</label>
-                                <input type="text" name="pet_breed" class="input-field" placeholder="e.g. Bichon">
-                            </div>
-                            <div class="input-group" style="flex: 1;">
-                                <label class="input-label">Size/Weight</label>
-                                <input type="text" name="pet_size" class="input-field" placeholder="e.g. 3kg">
-                            </div>
-                        </div>
-                        <div class="input-group">
-                            <label class="input-label">Full Body Photo</label>
-                            <div class="file-upload-wrapper">
-                                <input type="file" name="pet_image" id="mypage-file-upload" class="file-upload-input" accept="image/*" required>
-                                <label for="mypage-file-upload" class="file-upload-label">
-                                    📸 Select Photo (Click)
-                                </label>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn-black">Add Pet Profile</button>
-                    </form>
-                </div>
             </div>
         </div>
     </div>

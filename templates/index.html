@@ -62,7 +62,7 @@
             {% for product in products %}
             <div class="product-card" onclick="location.href='/product/{{ product.id }}'">
                 <div class="img-box">
-                    <img src="{{ product.image }}" alt="{{ product.name }}" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image'">
+                    <img src="/product_image/{{ product.id }}" alt="{{ product.name }}" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image'">
                     <div class="rank-badge">{{ loop.index }}</div>
                 </div>
                 <div class="info-box">

@@ -1,46 +1,82 @@
 import os
-import sqlite3
-import requests
-import re 
+import re
 import uuid
-import time
 import base64
-from deep_translator import GoogleTranslator
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, g
+import time
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from google import genai
 from google.genai import types
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except Exception:
-    pass
+from deep_translator import GoogleTranslator
+import requests
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key' 
-
+app.secret_key = os.environ.get('SECRET_KEY', 'your_secret_key_change_in_production')
 app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
-NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID");
-NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# Database connection
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL:
+    print("WARNING: DATABASE_URL not set. Please set it to your Neon PostgreSQL connection string.")
+    DATABASE_URL = "postgresql://user:pass@host/db"  # Placeholder
+
+# API Keys
+NAVER_CLIENT_ID = os.environ.get('NAVER_CLIENT_ID', 'Js36ALdCTg6fZ8v8T78g')
+NAVER_CLIENT_SECRET = os.environ.get('NAVER_CLIENT_SECRET', 'vsvGv1iGyZ')
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '')
 
 gemini_client = None
-if GOOGLE_API_KEY:
+if GOOGLE_API_KEY and "AIza" in GOOGLE_API_KEY:
     try:
         gemini_client = genai.Client(api_key=GOOGLE_API_KEY)
         print(">>> Gemini Client Initialized.")
     except Exception as e:
         print(f">>> Gemini Client Init Error: {e}")
 else:
-    print(">>> Warning: Google API Key is missing.")
+    print(">>> Warning: Google API Key is missing or invalid.")
 
+
+# =======================
+# Database helper functions
+# =======================
+def get_db():
+    """Get database connection"""
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        raise
+
+
+def init_db():
+    """Initialize database with schema"""
+    try:
+        conn = get_db()
+        with conn.cursor() as cur:
+            with open('db/schema_postgres.sql', 'r') as f:
+                cur.execute(f.read())
+        conn.commit()
+        conn.close()
+        print(">>> Database initialized successfully")
+    except Exception as e:
+        print(f">>> Database initialization error: {e}")
+        raise
+
+
+# =======================
+# Product Classification
+# =======================
 def classify_product(title):
+    """Classify product based on title"""
     title = title.lower()
     if any(word in title for word in ['padding', 'coat', 'outer', 'jacket', 'vest', 'jumper', 'cardigan']):
         return 'Outer'
@@ -55,595 +91,1019 @@ def classify_product(title):
     else:
         return 'Etc'
 
-#Query changed to Korean ("강아지 옷") for Naver API accuracy
+
+def assign_weather_tag(category, title):
+    """Assign weather tag based on product category and title"""
+    title_lower = title.lower()
+    if category == 'Outer' or 'winter' in title_lower or 'warm' in title_lower:
+        return 'cold'
+    elif 'rain' in title_lower or 'waterproof' in title_lower:
+        return 'rain'
+    else:
+        return 'all-season'
+
+
+def assign_style_tag(title):
+    """Assign style tag based on title"""
+    title_lower = title.lower()
+    if any(word in title_lower for word in ['sport', 'athletic', 'active']):
+        return 'sport'
+    elif any(word in title_lower for word in ['street', 'urban', 'cool']):
+        return 'street'
+    else:
+        return 'classic'
+
+
+# =======================
+# Naver API Integration
+# =======================
 def fetch_naver_api_products(query="강아지 옷", display=20):
-    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET or "Here" in NAVER_CLIENT_ID:
+    """Fetch products from Naver Shopping API"""
+    if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
         return []
+    
     url = "https://openapi.naver.com/v1/search/shop.json"
-    headers = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
+    headers = {
+        "X-Naver-Client-Id": NAVER_CLIENT_ID,
+        "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
+    }
     params = {"query": query, "display": display, "sort": "sim"}
     products = []
     translator = GoogleTranslator(source='ko', target='en')
+    
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=10)
         if response.status_code == 200:
             items = response.json().get('items', [])
-            sizes = ['S', 'M', 'L']
             for item in items:
                 try:
                     raw_title = item['title']
                     clean_title = re.sub('<[^<]+?>', '', raw_title)
                     price = int(item['lprice'])
                     image_url = item['image']
-                    brand = item.get('brand', '')
-                    if not brand: brand = item.get('mallName', 'NaverStore')
+                    brand = item.get('brand', '') or item.get('mallName', 'NaverStore')
                     
                     try:
                         eng_title = translator.translate(clean_title)
-                        eng_brand = translator.translate(brand) if re.search('[a-zA-Z]', brand) is None else brand
+                        eng_brand = translator.translate(brand) if not re.search('[a-zA-Z]', brand) else brand
                     except:
                         eng_title = clean_title
                         eng_brand = brand
                     
                     usd_price = round(price / 1300)
-                    if usd_price < 1: usd_price = 1
+                    if usd_price < 1:
+                        usd_price = 1
                     
                     category = classify_product(eng_title)
-                    size = sizes[len(clean_title) % 3]
+                    weather_tag = assign_weather_tag(category, eng_title)
+                    style_tag = assign_style_tag(eng_title)
                     description = "High-quality K-Pet fashion item sourced directly from Korea."
-                    products.append((eng_title, usd_price, eng_brand, category, size, image_url, description))
-                except: continue
-    except: pass
+                    
+                    products.append({
+                        'name': eng_title,
+                        'price': usd_price,
+                        'brand': eng_brand,
+                        'category': category,
+                        'image_url': image_url,
+                        'description': description,
+                        'weather_tag': weather_tag,
+                        'style_tag': style_tag
+                    })
+                except:
+                    continue
+    except:
+        pass
+    
     return products
 
-def init_db():
-    conn = sqlite3.connect('petshop.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, pet_name TEXT, pet_breed TEXT, pet_size TEXT, pet_image TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS pets (id INTEGER PRIMARY KEY, user_id INTEGER, name TEXT, breed TEXT, size TEXT, image TEXT, created_at INTEGER)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price INTEGER, brand TEXT, category TEXT, image TEXT, description TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS cart_items (id INTEGER PRIMARY KEY, user_id INTEGER, product_id INTEGER, size TEXT, qty INTEGER, created_at INTEGER)''')
-    c.execute('PRAGMA table_info(products)')
-    product_columns = [row[1] for row in c.fetchall()]
-    if 'size' not in product_columns:
-        c.execute('ALTER TABLE products ADD COLUMN size TEXT')
-    c.execute('PRAGMA table_info(users)')
-    user_columns = [row[1] for row in c.fetchall()]
-    if 'email' not in user_columns:
-        c.execute('ALTER TABLE users ADD COLUMN email TEXT')
-    c.execute('SELECT count(*) FROM products')
-    if c.fetchone()[0] == 0:
-        # [Modified] Using Korean query for initialization
-        api_data = fetch_naver_api_products("강아지 옷", display=20)
-        if api_data:
-            c.executemany(
-                'INSERT INTO products (name, price, brand, category, size, image, description) VALUES (?,?,?,?,?,?,?)',
-                api_data
-            )
-            conn.commit()
-    c.execute('UPDATE products SET size = ? WHERE size IS NULL OR size = ""', ('M',))
 
-    # One-time migration: copy existing user pet profiles into pets table.
-    c.execute('SELECT id, pet_name, pet_breed, pet_size, pet_image FROM users')
-    users = c.fetchall()
-    for user in users:
-        user_id, pet_name, pet_breed, pet_size, pet_image = user
-        if any([pet_name, pet_breed, pet_size, pet_image]):
-            c.execute('SELECT count(*) FROM pets WHERE user_id = ?', (user_id,))
-            if c.fetchone()[0] == 0:
-                c.execute(
-                    'INSERT INTO pets (user_id, name, breed, size, image, created_at) VALUES (?,?,?,?,?,?)',
-                    (user_id, pet_name, pet_breed, pet_size, pet_image, int(time.time()))
-                )
+# =======================
+# Recommendation Engine - Score-Based Formula
+# =======================
+def calculate_fit_score(pet_chest, pet_back, pet_neck, product_chest, product_back, product_neck):
+    """
+    Calculate fit score based on size matching.
+    Smaller difference = higher score.
+    Formula: 1 - (total_diff / max_possible_diff)
+    """
+    chest_diff = abs(float(pet_chest) - float(product_chest))
+    back_diff = abs(float(pet_back) - float(product_back))
+    
+    # Neck is optional
+    if pet_neck and product_neck:
+        neck_diff = abs(float(pet_neck) - float(product_neck))
+        total_diff = chest_diff + back_diff + neck_diff
+        max_possible = 30  # Arbitrary max difference
+    else:
+        total_diff = chest_diff + back_diff
+        max_possible = 20
+    
+    # Normalize to 0-1 scale (1 = perfect fit, 0 = worst fit)
+    fit_score = max(0, 1 - (total_diff / max_possible))
+    return fit_score
+
+
+def calculate_weather_score(current_season='all-season'):
+    """
+    Calculate weather score.
+    For MVP, return neutral score. Can be enhanced with weather API.
+    """
+    return 0.5
+
+
+def calculate_style_score(product_style):
+    """
+    Calculate style score.
+    For MVP, return neutral score. Can be enhanced with user preferences.
+    """
+    return 0.5
+
+
+def calculate_price_score(price_cents):
+    """
+    Calculate price score.
+    Lower price = higher score (budget-friendly)
+    Normalized: max price assumed at $100
+    """
+    max_price = 10000  # $100 in cents
+    normalized = min(price_cents, max_price) / max_price
+    return 1 - normalized  # Invert: lower price = higher score
+
+
+def calculate_popularity_score(popularity):
+    """
+    Return popularity score (already normalized 0-1)
+    """
+    return float(popularity)
+
+
+def get_pet_estimated_dimensions(pet_data, breed_data):
+    """
+    Estimate pet dimensions based on breed and weight.
+    
+    Formula:
+    - If weight provided: estimated_size = avg_breed_size * (dog_weight / avg_breed_weight)
+    - If no weight: use average breed size
+    """
+    if not breed_data or not breed_data.get('avg_chest_cm'):
+        # Default dimensions for unknown breed
+        return {
+            'chest_cm': 40,
+            'back_cm': 32,
+            'neck_cm': 28
+        }
+    
+    avg_chest = float(breed_data['avg_chest_cm'] or 40)
+    avg_back = float(breed_data['avg_back_cm'] or 32)
+    avg_neck = float(breed_data['avg_neck_cm'] or 28)
+    avg_weight = float(breed_data['avg_weight_kg'] or 5)
+    
+    if pet_data.get('weight_kg'):
+        pet_weight = float(pet_data['weight_kg'])
+        weight_ratio = pet_weight / avg_weight
+        
+        estimated_chest = avg_chest * weight_ratio
+        estimated_back = avg_back * weight_ratio
+        estimated_neck = avg_neck * weight_ratio
+    else:
+        estimated_chest = avg_chest
+        estimated_back = avg_back
+        estimated_neck = avg_neck
+    
+    return {
+        'chest_cm': estimated_chest,
+        'back_cm': estimated_back,
+        'neck_cm': estimated_neck
+    }
+
+
+def generate_recommendations(pet_id, top_n=3):
+    """
+    Generate top N product recommendations for a pet using score-based formula.
+    
+    Formula:
+    total_score = 0.55*fit + 0.20*weather + 0.15*style + 0.05*price + 0.05*popularity
+    """
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Get pet data with breed info
+    cur.execute("""
+        SELECT p.*, b.name as breed_name, b.avg_weight_kg, b.avg_chest_cm, 
+               b.avg_back_cm, b.avg_neck_cm
+        FROM pets p
+        LEFT JOIN breeds b ON p.breed_id = b.id
+        WHERE p.id = %s
+    """, (pet_id,))
+    pet_data = cur.fetchone()
+    
+    if not pet_data:
+        cur.close()
+        conn.close()
+        return []
+    
+    # Get estimated dimensions
+    breed_data = {
+        'avg_weight_kg': pet_data.get('avg_weight_kg'),
+        'avg_chest_cm': pet_data.get('avg_chest_cm'),
+        'avg_back_cm': pet_data.get('avg_back_cm'),
+        'avg_neck_cm': pet_data.get('avg_neck_cm')
+    }
+    
+    pet_dimensions = get_pet_estimated_dimensions(pet_data, breed_data)
+    
+    # Get all active products with their sizes
+    cur.execute("""
+        SELECT p.id as product_id, p.name, p.brand, p.category, p.description,
+               p.base_price_cents, p.weather_tag, p.style_tag, p.popularity_score,
+               p.image_url,
+               ps.id as size_id, ps.label as size_label, ps.chest_cm, ps.back_cm, ps.neck_cm
+        FROM products p
+        JOIN product_sizes ps ON p.id = ps.product_id
+        WHERE p.active = TRUE
+        ORDER BY p.id, ps.label
+    """)
+    products = cur.fetchall()
+    
+    # Calculate scores for each product-size combination
+    scored_products = []
+    
+    for product in products:
+        # Calculate individual scores
+        fit_score = calculate_fit_score(
+            pet_dimensions['chest_cm'],
+            pet_dimensions['back_cm'],
+            pet_dimensions['neck_cm'],
+            product['chest_cm'],
+            product['back_cm'],
+            product['neck_cm']
+        )
+        
+        weather_score = calculate_weather_score()
+        style_score = calculate_style_score(product['style_tag'])
+        price_score = calculate_price_score(product['base_price_cents'])
+        popularity_score = calculate_popularity_score(product['popularity_score'])
+        
+        # Apply formula: 0.55*fit + 0.20*weather + 0.15*style + 0.05*price + 0.05*popularity
+        total_score = (
+            0.55 * fit_score +
+            0.20 * weather_score +
+            0.15 * style_score +
+            0.05 * price_score +
+            0.05 * popularity_score
+        )
+        
+        scored_products.append({
+            'product_id': product['product_id'],
+            'size_id': product['size_id'],
+            'name': product['name'],
+            'brand': product['brand'],
+            'category': product['category'],
+            'description': product['description'],
+            'price': product['base_price_cents'] / 100,  # Convert to dollars
+            'size_label': product['size_label'],
+            'total_score': total_score,
+            'fit_score': fit_score,
+            'weather_score': weather_score,
+            'style_score': style_score,
+            'price_score': price_score,
+            'popularity_score': popularity_score,
+            'chest_cm': float(product['chest_cm']),
+            'back_cm': float(product['back_cm']),
+            'neck_cm': float(product['neck_cm']) if product['neck_cm'] else None
+        })
+    
+    # Sort by total score and get top N
+    scored_products.sort(key=lambda x: x['total_score'], reverse=True)
+    top_recommendations = scored_products[:top_n]
+    
+    # Log recommendations
+    user_id = pet_data['user_id']
+    for rec in top_recommendations:
+        cur.execute("""
+            INSERT INTO recommendation_logs 
+            (user_id, pet_id, product_id, product_size_id, score_total, 
+             score_fit, score_weather, score_style, score_price, score_popularity)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (user_id, pet_id, rec['product_id'], rec['size_id'], 
+              rec['total_score'], rec['fit_score'], rec['weather_score'],
+              rec['style_score'], rec['price_score'], rec['popularity_score']))
+    
     conn.commit()
+    cur.close()
     conn.close()
+    
+    return top_recommendations
 
-init_db()
 
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect('petshop.db')
-        db.row_factory = sqlite3.Row
-    return db
-
-def normalize_pet_size(size_text):
-    if not size_text:
-        return None
-    match = re.search(r'(\d+(?:\.\d+)?)', size_text)
-    if match:
-        weight = float(match.group(1))
-        if weight < 3:
-            return 'S'
-        if weight < 7:
-            return 'M'
-        return 'L'
-    size_text = size_text.upper()
-    if 'S' in size_text:
-        return 'S'
-    if 'M' in size_text:
-        return 'M'
-    if 'L' in size_text:
-        return 'L'
-    return None
-
-def size_prompt_hint(size_bucket):
-    if size_bucket == 'S':
-        return "The clothing should look snug and compact."
-    if size_bucket == 'M':
-        return "The clothing should look balanced and true-to-size."
-    if size_bucket == 'L':
-        return "The clothing should look roomier with a relaxed fit."
-    return ""
-
-@app.context_processor
-def inject_nav_pets():
-    if 'user_id' not in session:
-        return {'nav_pets': []}
-    db = get_db()
-    pets = db.execute(
-        'SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC, id DESC',
-        (session['user_id'],)
-    ).fetchall()
-    return {'nav_pets': pets}
-
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
-
+# =======================
+# Routes
+# =======================
 @app.route('/')
 def index():
+    """Home page - show products"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
     category = request.args.get('category')
-    db = get_db()
+    
     if category and category != 'All':
-        products = db.execute('SELECT * FROM products WHERE category = ?', (category,)).fetchall()
+        cur.execute("""
+            SELECT DISTINCT ON (p.id) p.*, ps.label as size_label
+            FROM products p
+            LEFT JOIN product_sizes ps ON p.id = ps.product_id
+            WHERE p.active = TRUE AND p.category = %s
+            ORDER BY p.id, p.created_at DESC
+            LIMIT 20
+        """, (category,))
     else:
-        products = db.execute('SELECT * FROM products').fetchall()
+        cur.execute("""
+            SELECT DISTINCT ON (p.id) p.*, ps.label as size_label
+            FROM products p
+            LEFT JOIN product_sizes ps ON p.id = ps.product_id
+            WHERE p.active = TRUE
+            ORDER BY p.id, p.created_at DESC
+            LIMIT 20
+        """)
+    
+    products = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    # Convert price to dollars
+    for p in products:
+        p['price'] = p['base_price_cents'] / 100
+    
     return render_template('index.html', products=products, current_category=category)
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    """User registration"""
     if request.method == 'POST':
-        username = request.form['username']
-        password = generate_password_hash(request.form['password'])
-        pet_name = request.form.get('pet_name')
-        pet_breed = request.form.get('pet_breed')
-        pet_size = request.form.get('pet_size')
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
         
-        pet_image_filename = None
-        if 'pet_image' in request.files:
-            file = request.files['pet_image']
-            if file.filename != '':
-                filename = secure_filename(file.filename)
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                pet_image_filename = filename
-
-        db = get_db()
-        cursor = db.execute(
-            'INSERT INTO users (username, password, pet_name, pet_breed, pet_size, pet_image) VALUES (?, ?, ?, ?, ?, ?)',
-            (username, password, pet_name, pet_breed, pet_size, pet_image_filename)
-        )
-        user_id = cursor.lastrowid
-        if any([pet_name, pet_breed, pet_size, pet_image_filename]):
-            db.execute(
-                'INSERT INTO pets (user_id, name, breed, size, image, created_at) VALUES (?,?,?,?,?,?)',
-                (user_id, pet_name, pet_breed, pet_size, pet_image_filename, int(time.time()))
+        if not username or not password:
+            flash('Username and password are required', 'error')
+            return redirect(url_for('register'))
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        try:
+            password_hash = generate_password_hash(password)
+            cur.execute(
+                "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, %s)",
+                (username, email, password_hash)
             )
-        db.commit()
-        return redirect(url_for('login'))
+            conn.commit()
+            flash('Registration successful! Please login.', 'success')
+            return redirect(url_for('login'))
+        except psycopg2.IntegrityError:
+            conn.rollback()
+            flash('Username or email already exists', 'error')
+        finally:
+            cur.close()
+            conn.close()
+    
     return render_template('register.html')
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    """User login"""
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        db = get_db()
-        user = db.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        username = request.form.get('username')
+        password = request.form.get('password')
         
-        if user and check_password_hash(user['password'], password):
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        user = cur.fetchone()
+        
+        cur.close()
+        conn.close()
+        
+        if user and check_password_hash(user['password_hash'], password):
             session['user_id'] = user['id']
             session['username'] = user['username']
-            session['pet_image'] = user['pet_image']
-            return redirect(url_for('index'))
+            flash('Login successful!', 'success')
+            return redirect(url_for('mypage'))
+        else:
+            flash('Invalid username or password', 'error')
+    
     return render_template('login.html')
+
 
 @app.route('/logout')
 def logout():
+    """User logout"""
     session.clear()
+    flash('Logged out successfully', 'success')
     return redirect(url_for('index'))
+
+
+@app.route('/pet_image/<int:pet_id>')
+def pet_image(pet_id):
+    """Serve pet image from database"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cur.execute("SELECT image_data, image_mime_type FROM pets WHERE id = %s", (pet_id,))
+    result = cur.fetchone()
+    
+    cur.close()
+    conn.close()
+    
+    if result and result['image_data']:
+        from flask import Response
+        return Response(bytes(result['image_data']), mimetype=result['image_mime_type'] or 'image/jpeg')
+    else:
+        # Return a placeholder image
+        return redirect('/static/placeholder-pet.png')
+
+
+@app.route('/product_image/<int:product_id>')
+def product_image(product_id):
+    """Serve product image from database"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cur.execute("SELECT image_data, image_mime_type FROM products WHERE id = %s", (product_id,))
+    result = cur.fetchone()
+    
+    cur.close()
+    conn.close()
+    
+    if result and result['image_data']:
+        from flask import Response
+        return Response(bytes(result['image_data']), mimetype=result['image_mime_type'] or 'image/jpeg')
+    else:
+        # For products without images, try to show from URL if exists
+        return redirect('/static/placeholder-product.png')
+
 
 @app.route('/mypage')
 def mypage():
+    """User's page showing their pets"""
     if 'user_id' not in session:
+        flash('Please login first', 'error')
         return redirect(url_for('login'))
-
-    db = get_db()
-    user = db.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
-    if user is None:
-        session.clear()
-        return redirect(url_for('login'))
-
-    pets = db.execute(
-        'SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC, id DESC',
-        (session['user_id'],)
-    ).fetchall()
-
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Get user info
+    cur.execute("SELECT * FROM users WHERE id = %s", (session['user_id'],))
+    user = cur.fetchone()
+    
+    # Get user's pets
+    cur.execute("""
+        SELECT p.*, b.name as breed_name
+        FROM pets p
+        LEFT JOIN breeds b ON p.breed_id = b.id
+        WHERE p.user_id = %s
+        ORDER BY p.created_at DESC
+    """, (session['user_id'],))
+    pets = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
     return render_template('mypage.html', user=user, pets=pets)
 
+
 @app.route('/account/update', methods=['POST'])
-def update_account():
+def account_update():
+    """Update user account details"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Get current user
+    cur.execute("SELECT * FROM users WHERE id = %s", (session['user_id'],))
+    user = cur.fetchone()
+    
+    if not user:
+        cur.close()
+        conn.close()
+        return redirect(url_for('login'))
+    
     email = request.form.get('email')
     current_password = request.form.get('current_password')
     new_password = request.form.get('new_password')
     confirm_password = request.form.get('confirm_password')
-
-    db = get_db()
-    user = db.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
-    if user is None:
-        session.clear()
-        return redirect(url_for('login'))
-
-    if email is not None and email.strip() != '':
-        db.execute('UPDATE users SET email = ? WHERE id = ?', (email.strip(), session['user_id']))
-
-    if current_password and new_password and confirm_password:
-        if new_password == confirm_password and check_password_hash(user['password'], current_password):
-            new_hash = generate_password_hash(new_password)
-            db.execute('UPDATE users SET password = ? WHERE id = ?', (new_hash, session['user_id']))
-
-    db.commit()
+    
+    updates = []
+    params = []
+    
+    # Update email
+    if email:
+        updates.append('email = %s')
+        params.append(email)
+    
+    # Update password
+    if current_password and new_password and new_password == confirm_password:
+        if check_password_hash(user['password_hash'], current_password):
+            updates.append('password_hash = %s')
+            params.append(generate_password_hash(new_password))
+            flash('Password updated successfully!', 'success')
+        else:
+            flash('Current password is incorrect', 'error')
+            cur.close()
+            conn.close()
+            return redirect(url_for('mypage'))
+    
+    if updates:
+        params.append(session['user_id'])
+        cur.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = %s", tuple(params))
+        conn.commit()
+        flash('Account updated successfully!', 'success')
+    
+    cur.close()
+    conn.close()
     return redirect(url_for('mypage'))
 
-@app.route('/pets/add', methods=['POST'])
+
+@app.route('/pets/add', methods=['GET', 'POST'])
 def add_pet():
+    """Create a new pet profile"""
     if 'user_id' not in session:
+        flash('Please login first', 'error')
         return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        name = request.form.get('pet_name') or request.form.get('name')
+        breed_id = request.form.get('breed_id')
+        weight_kg = request.form.get('weight_kg')
+        size_label = request.form.get('size_label') or request.form.get('pet_size')
+        
+        # Handle image upload - store in database
+        image_data = None
+        mime_type = None
+        
+        if 'pet_image' in request.files:
+            file = request.files['pet_image']
+            if file and file.filename:
+                image_data = file.read()
+                mime_type = file.content_type or 'image/jpeg'
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        try:
+            cur.execute("""
+                INSERT INTO pets (user_id, name, breed_id, weight_kg, size_label, image_data, image_mime_type)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (session['user_id'], name, breed_id or None, 
+                  weight_kg or None, size_label, 
+                  psycopg2.Binary(image_data) if image_data else None, 
+                  mime_type))
+            
+            pet_id = cur.fetchone()[0]
+            conn.commit()
+            flash('Pet profile created successfully!', 'success')
+            return redirect(url_for('mypage'))
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error creating pet: {str(e)}', 'error')
+        finally:
+            cur.close()
+            conn.close()
+    
+    # GET request - show form with breeds
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM breeds ORDER BY name")
+    breeds = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template('create_pet.html', breeds=breeds)
 
-    pet_name = request.form.get('pet_name')
-    pet_breed = request.form.get('pet_breed')
-    pet_size = request.form.get('pet_size')
-    pet_image_filename = None
-
-    if 'pet_image' in request.files:
-        file = request.files['pet_image']
-        if file and file.filename != '':
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            pet_image_filename = filename
-
-    if not pet_image_filename:
-        return redirect(url_for('mypage'))
-
-    if not any([pet_name, pet_breed, pet_size, pet_image_filename]):
-        return redirect(url_for('mypage'))
-
-    db = get_db()
-    db.execute(
-        'INSERT INTO pets (user_id, name, breed, size, image, created_at) VALUES (?,?,?,?,?,?)',
-        (session['user_id'], pet_name, pet_breed, pet_size, pet_image_filename, int(time.time()))
-    )
-    db.commit()
-    return redirect(url_for('mypage'))
 
 @app.route('/pets/update/<int:pet_id>', methods=['POST'])
 def update_pet(pet_id):
+    """Update pet profile"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-
-    pet_name = request.form.get('pet_name')
-    pet_breed = request.form.get('pet_breed')
-    pet_size = request.form.get('pet_size')
-    pet_image_filename = None
-
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Verify ownership
+    cur.execute("SELECT * FROM pets WHERE id = %s AND user_id = %s", (pet_id, session['user_id']))
+    if not cur.fetchone():
+        flash('Pet not found', 'error')
+        cur.close()
+        conn.close()
+        return redirect(url_for('mypage'))
+    
+    updates = []
+    params = []
+    
+    name = request.form.get('pet_name')
+    breed_id = request.form.get('breed_id')
+    weight_kg = request.form.get('weight_kg')
+    size_label = request.form.get('pet_size')
+    
+    if name:
+        updates.append('name = %s')
+        params.append(name)
+    if breed_id:
+        updates.append('breed_id = %s')
+        params.append(breed_id)
+    if weight_kg:
+        updates.append('weight_kg = %s')
+        params.append(weight_kg)
+    if size_label:
+        updates.append('size_label = %s')
+        params.append(size_label)
+    
+    # Handle image - store in database
     if 'pet_image' in request.files:
         file = request.files['pet_image']
-        if file and file.filename != '':
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            pet_image_filename = filename
-
-    db = get_db()
-    pet = db.execute(
-        'SELECT * FROM pets WHERE id = ? AND user_id = ?',
-        (pet_id, session['user_id'])
-    ).fetchone()
-    if pet is None:
-        return redirect(url_for('mypage'))
-
-    update_fields = []
-    update_params = []
-    if pet_name is not None:
-        update_fields.append('name = ?')
-        update_params.append(pet_name)
-    if pet_breed is not None:
-        update_fields.append('breed = ?')
-        update_params.append(pet_breed)
-    if pet_size is not None:
-        update_fields.append('size = ?')
-        update_params.append(pet_size)
-    if pet_image_filename:
-        update_fields.append('image = ?')
-        update_params.append(pet_image_filename)
-
-    if update_fields:
-        update_params.extend([pet_id, session['user_id']])
-        db.execute(
-            f'UPDATE pets SET {", ".join(update_fields)} WHERE id = ? AND user_id = ?',
-            tuple(update_params)
-        )
-        db.commit()
-
+        if file and file.filename:
+            image_data = file.read()
+            mime_type = file.content_type or 'image/jpeg'
+            updates.append('image_data = %s')
+            params.append(psycopg2.Binary(image_data))
+            updates.append('image_mime_type = %s')
+            params.append(mime_type)
+    
+    if updates:
+        params.append(pet_id)
+        cur.execute(f"UPDATE pets SET {', '.join(updates)} WHERE id = %s", tuple(params))
+        conn.commit()
+        flash('Pet updated successfully!', 'success')
+    
+    cur.close()
+    conn.close()
     return redirect(url_for('mypage'))
+
 
 @app.route('/pets/delete/<int:pet_id>', methods=['POST'])
 def delete_pet(pet_id):
+    """Delete pet profile"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-
-    db = get_db()
-    db.execute(
-        'DELETE FROM pets WHERE id = ? AND user_id = ?',
-        (pet_id, session['user_id'])
-    )
-    db.commit()
+    
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('DELETE FROM pets WHERE id = %s AND user_id = %s', (pet_id, session['user_id']))
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    flash('Pet deleted successfully', 'success')
     return redirect(url_for('mypage'))
+
+
+@app.route('/recommendations', methods=['GET', 'POST'])
+def recommendations():
+    """Generate recommendations for a pet"""
+    if 'user_id' not in session:
+        flash('Please login first', 'error')
+        return redirect(url_for('login'))
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Get user's pets
+    cur.execute("""
+        SELECT p.*, b.name as breed_name
+        FROM pets p
+        LEFT JOIN breeds b ON p.breed_id = b.id
+        WHERE p.user_id = %s
+    """, (session['user_id'],))
+    pets = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    if not pets:
+        flash('Please create a pet profile first!', 'error')
+        return redirect(url_for('add_pet'))
+    
+    selected_pet_id = request.values.get('pet_id')
+    selected_pet = None
+    recs = []
+    
+    if selected_pet_id:
+        selected_pet = next((p for p in pets if str(p['id']) == str(selected_pet_id)), None)
+        if selected_pet:
+            recs = generate_recommendations(int(selected_pet_id), top_n=3)
+    elif len(pets) == 1:
+        selected_pet = pets[0]
+        recs = generate_recommendations(pets[0]['id'], top_n=3)
+    
+    return render_template('recommendations.html', 
+                         pets=pets,
+                         selected_pet=selected_pet,
+                         recommendations=recs)
+
 
 @app.route('/product/<int:product_id>')
 def product_detail(product_id):
-    db = get_db()
-    product = db.execute('SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
+    """Product detail page"""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cur.execute("SELECT * FROM products WHERE id = %s", (product_id,))
+    product = cur.fetchone()
+    
+    if product:
+        product['price'] = product['base_price_cents'] / 100
+        
+        # Get sizes
+        cur.execute("""
+            SELECT * FROM product_sizes 
+            WHERE product_id = %s 
+            ORDER BY label
+        """, (product_id,))
+        sizes = cur.fetchall()
+        product['sizes'] = sizes
+    
+    cur.close()
+    conn.close()
+    
     return render_template('detail.html', product=product)
 
-@app.route('/cart')
-def cart():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    db = get_db()
-    items = db.execute(
-        '''
-        SELECT c.id, c.size, c.qty, p.id AS product_id, p.name, p.price, p.image
-        FROM cart_items c
-        JOIN products p ON c.product_id = p.id
-        WHERE c.user_id = ?
-        ORDER BY c.created_at DESC, c.id DESC
-        ''',
-        (session['user_id'],)
-    ).fetchall()
-
-    total = sum(item['price'] * item['qty'] for item in items)
-    return render_template('cart.html', items=items, total=total)
-
-@app.route('/cart/add', methods=['POST'])
-def cart_add():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    product_id = request.form.get('product_id')
-    size = request.form.get('size', 'M').strip().upper()
-    qty = request.form.get('qty', '1')
-
-    try:
-        qty = max(1, int(qty))
-    except Exception:
-        qty = 1
-
-    if not product_id:
-        return redirect(url_for('cart'))
-
-    db = get_db()
-    product = db.execute('SELECT id FROM products WHERE id = ?', (product_id,)).fetchone()
-    if product is None:
-        return redirect(url_for('cart'))
-
-    existing = db.execute(
-        'SELECT id, qty FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?',
-        (session['user_id'], product_id, size)
-    ).fetchone()
-
-    if existing:
-        db.execute(
-            'UPDATE cart_items SET qty = ? WHERE id = ?',
-            (existing['qty'] + qty, existing['id'])
-        )
-    else:
-        db.execute(
-            'INSERT INTO cart_items (user_id, product_id, size, qty, created_at) VALUES (?,?,?,?,?)',
-            (session['user_id'], product_id, size, qty, int(time.time()))
-        )
-    db.commit()
-    return redirect(url_for('cart'))
-
-@app.route('/cart/update/<int:item_id>', methods=['POST'])
-def cart_update(item_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    size = request.form.get('size', 'M').strip().upper()
-    qty = request.form.get('qty', '1')
-
-    try:
-        qty = max(1, int(qty))
-    except Exception:
-        qty = 1
-
-    db = get_db()
-    db.execute(
-        'UPDATE cart_items SET size = ?, qty = ? WHERE id = ? AND user_id = ?',
-        (size, qty, item_id, session['user_id'])
-    )
-    db.commit()
-    return redirect(url_for('cart'))
-
-@app.route('/cart/remove/<int:item_id>', methods=['POST'])
-def cart_remove(item_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    db = get_db()
-    db.execute(
-        'DELETE FROM cart_items WHERE id = ? AND user_id = ?',
-        (item_id, session['user_id'])
-    )
-    db.commit()
-    return redirect(url_for('cart'))
 
 @app.route('/api/fit_clothing', methods=['POST'])
 def fit_clothing():
+    """Gemini AI virtual try-on"""
     if 'user_id' not in session:
-        return jsonify({'error': 'login_required', 'message': 'Please login first.'}), 401
-
-    db = get_db()
-    user_id = session['user_id']
+        return jsonify({'error': 'login_required'}), 401
     
     product_name = request.form.get('product_name', 'Stylish Dog Clothes')
-    product_image_url = request.form.get('product_image_url') 
-    product_size = request.form.get('product_size')
+    product_image_url = request.form.get('product_image_url')
+    pet_id = request.form.get('pet_id')
     
-    selected_pet_id = request.form.get('pet_id')
-    new_name = request.form.get('pet_name')
-    new_breed = request.form.get('pet_breed')
-    new_size = request.form.get('pet_size')
-    new_image_file = request.files.get('user_image')
-
-    new_image_filename = None
-    if new_image_file and new_image_file.filename != '':
-        filename = secure_filename(new_image_file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        new_image_file.save(file_path)
-        new_image_filename = filename
-
-    pet = None
-    if selected_pet_id:
-        pet = db.execute(
-            'SELECT * FROM pets WHERE id = ? AND user_id = ?',
-            (selected_pet_id, user_id)
-        ).fetchone()
-    elif any([new_name, new_breed, new_size, new_image_filename]):
-        db.execute(
-            'INSERT INTO pets (user_id, name, breed, size, image, created_at) VALUES (?,?,?,?,?,?)',
-            (user_id, new_name, new_breed, new_size, new_image_filename, int(time.time()))
-        )
-        db.commit()
-        pet = db.execute(
-            'SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
-            (user_id,)
-        ).fetchone()
-    else:
-        pet = db.execute(
-            'SELECT * FROM pets WHERE user_id = ? AND image IS NOT NULL AND image != "" ORDER BY created_at DESC, id DESC LIMIT 1',
-            (user_id,)
-        ).fetchone()
-        if pet is None:
-            pet = db.execute(
-                'SELECT * FROM pets WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
-                (user_id,)
-            ).fetchone()
-
-    if pet is None or not pet['image']:
-        return jsonify({'error': 'no_image', 'message': 'Pet profile or image missing.'}), 400
-
-    pet_breed = pet['breed'] if pet['breed'] else 'Dog'
-    pet_size = pet['size']
-    pet_image_filename = pet['image']
-    pet_size_bucket = normalize_pet_size(pet_size) if pet_size else None
-    product_size_bucket = product_size.strip().upper() if product_size else None
-
-    print(f">>> Multimodal Request: Breed={pet_breed}, Product={product_name}")
+    if not pet_id:
+        return jsonify({'error': 'Pet ID required'}), 400
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cur.execute("SELECT * FROM pets WHERE id = %s AND user_id = %s", (pet_id, session['user_id']))
+    pet = cur.fetchone()
+    
+    if not pet or not pet.get('image_url'):
+        return jsonify({'error': 'Pet image required'}), 400
+    
+    pet_image_path = os.path.join(app.config['UPLOAD_FOLDER'], pet['image_url'].replace('/static/uploads/', ''))
+    
     generated_image_url = None
     
     if gemini_client and product_image_url:
         try:
-            pet_image_path = os.path.join(app.config['UPLOAD_FOLDER'], pet_image_filename)
             with open(pet_image_path, "rb") as f:
                 pet_image_data = f.read()
             
-            product_response = requests.get(product_image_url)
+            product_response = requests.get(product_image_url, timeout=10)
             product_image_data = product_response.content
-
-            size_context = []
-            if pet_size_bucket:
-                size_context.append(f"pet size {pet_size_bucket}")
-            if product_size_bucket:
-                size_context.append(f"clothing size {product_size_bucket}")
-            size_line = f" The fitting should reflect {', '.join(size_context)}." if size_context else ""
-            fit_hint = size_prompt_hint(product_size_bucket)
-            fit_line = f" {fit_hint}" if fit_hint else ""
-
+            
             prompt_text = (
-                f"Based on the provided images, create a realistic photograph of the {pet_breed} dog "
-                f"wearing the clothing item shown in the product image."
-                f"{size_line}{fit_line} The dog should be in a natural pose. High quality, detailed texture."
+                f"Create a realistic photograph of this dog wearing the clothing item shown. "
+                "Natural pose, high quality, detailed texture."
             )
-
+            
             contents = [
                 prompt_text,
                 types.Part.from_bytes(data=pet_image_data, mime_type="image/jpeg"),
                 types.Part.from_bytes(data=product_image_data, mime_type="image/jpeg")
             ]
-
+            
             response = gemini_client.models.generate_content(
-                model='gemini-3-pro-image-preview', 
+                model='gemini-2.0-flash-exp',
                 contents=contents,
                 config=types.GenerateContentConfig(
-                    response_modalities=["TEXT", "IMAGE"]
+                    response_modalities=["IMAGE"]
                 )
             )
             
             if response.candidates and response.candidates[0].content.parts:
                 for part in response.candidates[0].content.parts:
                     if part.inline_data:
-                        raw_data = part.inline_data.data
-                        image_bytes = None
-
-                        if isinstance(raw_data, bytes):
-                            image_bytes = raw_data
-                        elif isinstance(raw_data, str):
-                            image_bytes = base64.b64decode(raw_data)
+                        image_bytes = part.inline_data.data
+                        if isinstance(image_bytes, str):
+                            image_bytes = base64.b64decode(image_bytes)
                         
-                        if image_bytes:
-                            mime_type = part.inline_data.mime_type
-                            ext = ".png"
-                            
-                            if "jpeg" in mime_type or "jpg" in mime_type:
-                                ext = ".jpg"
-                            elif "webp" in mime_type:
-                                ext = ".webp"
-                            
-                            unique_filename = f"gemini_multi_{uuid.uuid4().hex[:8]}{ext}"
-                            
-                            save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                            with open(save_path, "wb") as f:
-                                f.write(image_bytes)
-                                
-                            generated_image_url = f"/static/uploads/{unique_filename}"
-                            print(f">>> Generated & Saved ({ext}): {generated_image_url}")
-                            break
-        
+                        unique_filename = f"gemini_{uuid.uuid4().hex[:8]}.png"
+                        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                        
+                        with open(save_path, "wb") as f:
+                            f.write(image_bytes)
+                        
+                        generated_image_url = f"/static/uploads/{unique_filename}"
+                        break
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            print(f">>> Gemini Multimodal Error: {e}")
-            pass
-            
-    if generated_image_url:
-        message = f"AI has synthesized the look based on your photos!"
-    else:
-        time.sleep(1)
+            print(f"Gemini error: {e}")
+    
+    cur.close()
+    conn.close()
+    
+    if not generated_image_url:
         generated_image_url = "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=600"
-        message = "Demo Mode: AI processing failed or timed out."
-
+    
     return jsonify({
         'success': True,
         'result_image': generated_image_url,
-        'message': message
+        'message': 'AI generated result'
     })
 
+
+@app.route('/admin/fetch_products', methods=['POST'])
+def admin_fetch_products():
+    """Admin: Fetch products from Naver API and populate database"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    products = fetch_naver_api_products(display=20)
+    
+    if not products:
+        return jsonify({'error': 'No products fetched'}), 400
+    
+    conn = get_db()
+    cur = conn.cursor()
+    
+    added_count = 0
+    for prod in products:
+        try:
+            # Download image from URL and store as binary
+            image_data = None
+            mime_type = 'image/jpeg'
+            if prod.get('image_url'):
+                try:
+                    img_response = requests.get(prod['image_url'], timeout=5)
+                    if img_response.status_code == 200:
+                        image_data = img_response.content
+                        mime_type = img_response.headers.get('Content-Type', 'image/jpeg')
+                except:
+                    pass
+            
+            # Insert product
+            cur.execute("""
+                INSERT INTO products 
+                (name, brand, category, description, base_price_cents, 
+                 weather_tag, style_tag, popularity_score, image_data, image_mime_type)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (prod['name'], prod['brand'], prod['category'], prod['description'],
+                  prod['price'] * 100, prod['weather_tag'], prod['style_tag'], 
+                  0.5, psycopg2.Binary(image_data) if image_data else None, mime_type))
+            
+            product_id = cur.fetchone()[0]
+            
+            # Add default sizes (S, M, L)
+            sizes = [
+                ('S', 35, 28, 24, 2, 5),
+                ('M', 45, 36, 30, 5, 12),
+                ('L', 60, 48, 38, 12, 30)
+            ]
+            
+            for size_label, chest, back, neck, min_w, max_w in sizes:
+                cur.execute("""
+                    INSERT INTO product_sizes 
+                    (product_id, label, chest_cm, back_cm, neck_cm, weight_min_kg, weight_max_kg)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (product_id, size_label, chest, back, neck, min_w, max_w))
+            
+            added_count += 1
+        except Exception as e:
+            print(f"Error adding product: {e}")
+            continue
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    return jsonify({'success': True, 'added': added_count})
+
+
+# =======================
+# Cart Routes
+# =======================
+@app.route('/cart')
+def cart():
+    """Display shopping cart"""
+    if 'user_id' not in session:
+        flash('Please log in to view your cart.')
+        return redirect(url_for('login'))
+    
+    # Get cart items from session (simple cart implementation)
+    cart_items = session.get('cart', [])
+    
+    # Calculate total
+    total = sum(item.get('price', 0) * item.get('qty', 1) for item in cart_items)
+    
+    return render_template('cart.html', items=cart_items, total=total)
+
+
+@app.route('/cart/add/<int:product_id>', methods=['POST'])
+def add_to_cart(product_id):
+    """Add product to cart"""
+    if 'user_id' not in session:
+        flash('Please log in to add items to cart.')
+        return redirect(url_for('login'))
+    
+    size = request.form.get('size', 'M')
+    qty = int(request.form.get('qty', 1))
+    
+    # Get product details
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, name, base_price_cents 
+        FROM products 
+        WHERE id = %s
+    """, (product_id,))
+    product = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not product:
+        flash('Product not found.')
+        return redirect(url_for('index'))
+    
+    # Initialize cart if needed
+    if 'cart' not in session:
+        session['cart'] = []
+    
+    # Check if item already in cart
+    cart = session['cart']
+    existing_item = next((item for item in cart if item['id'] == product_id and item['size'] == size), None)
+    
+    if existing_item:
+        existing_item['qty'] += qty
+    else:
+        cart.append({
+            'id': product['id'],
+            'name': product['name'],
+            'price': product['base_price_cents'] / 100,
+            'size': size,
+            'qty': qty,
+            'image': f'/product_image/{product_id}'
+        })
+    
+    session['cart'] = cart
+    session.modified = True
+    
+    flash(f'Added {product["name"]} to cart.')
+    return redirect(url_for('cart'))
+
+
+@app.route('/cart/update/<int:product_id>', methods=['POST'])
+def update_cart(product_id):
+    """Update cart item quantity or size"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    size = request.form.get('size', 'M')
+    qty = int(request.form.get('qty', 1))
+    
+    cart = session.get('cart', [])
+    for item in cart:
+        if item['id'] == product_id:
+            item['size'] = size
+            item['qty'] = qty
+            break
+    
+    session['cart'] = cart
+    session.modified = True
+    
+    flash('Cart updated.')
+    return redirect(url_for('cart'))
+
+
+@app.route('/cart/remove/<int:product_id>', methods=['POST'])
+def remove_from_cart(product_id):
+    """Remove item from cart"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    cart = session.get('cart', [])
+    session['cart'] = [item for item in cart if item['id'] != product_id]
+    session.modified = True
+    
+    flash('Item removed from cart.')
+    return redirect(url_for('cart'))
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Initialize database on startup
+    if DATABASE_URL and "postgresql" in DATABASE_URL:
+        try:
+            init_db()
+        except Exception as e:
+            print(f"Database initialization error: {e}")
+            print("Make sure DATABASE_URL is set correctly and db/schema_postgres.sql exists")
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)
