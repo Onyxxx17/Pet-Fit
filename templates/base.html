@@ -28,10 +28,13 @@
             </nav>
 
             <form class="header-search" action="/" method="GET">
-                <input type="text" name="q" class="search-input" placeholder="Search products" aria-label="Search products">
-                <button type="submit" class="search-btn" aria-label="Search">
-                    <span class="material-symbols-outlined">search</span>
-                </button>
+                <div class="search-wrapper">
+                    <input type="text" name="q" id="search-input" class="search-input" placeholder="Search products" aria-label="Search products" autocomplete="off">
+                    <button type="submit" class="search-btn" aria-label="Search">
+                        <span class="material-symbols-outlined">search</span>
+                    </button>
+                    <div id="search-suggestions" class="search-suggestions"></div>
+                </div>
             </form>
 
             <div class="user-menu">
@@ -134,5 +137,55 @@
     </footer>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        // Search autocomplete
+        const searchInput = document.getElementById('search-input');
+        const suggestionsBox = document.getElementById('search-suggestions');
+        let debounceTimer;
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(debounceTimer);
+                const query = this.value.trim();
+
+                if (query.length < 2) {
+                    suggestionsBox.innerHTML = '';
+                    suggestionsBox.style.display = 'none';
+                    return;
+                }
+
+                debounceTimer = setTimeout(async () => {
+                    try {
+                        const response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
+                        const data = await response.json();
+
+                        if (data.suggestions && data.suggestions.length > 0) {
+                            suggestionsBox.innerHTML = data.suggestions.map(item => `
+                                <a href="/product/${item.id}" class="suggestion-item">
+                                    <div class="suggestion-content">
+                                        <div class="suggestion-name">${item.name}</div>
+                                        <div class="suggestion-meta">${item.brand} · ${item.category} · $${item.price.toFixed(2)}</div>
+                                    </div>
+                                </a>
+                            `).join('');
+                            suggestionsBox.style.display = 'block';
+                        } else {
+                            suggestionsBox.innerHTML = '<div class="suggestion-item no-results">No results found</div>';
+                            suggestionsBox.style.display = 'block';
+                        }
+                    } catch (error) {
+                        console.error('Search error:', error);
+                    }
+                }, 300);
+            });
+
+            // Close suggestions when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                    suggestionsBox.style.display = 'none';
+                }
+            });
+        }
+    </script>
 </body>
 </html>

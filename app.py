@@ -435,8 +435,33 @@ def index():
     
     category = request.args.get('category')
     sort = request.args.get('sort')
+    search_query = request.args.get('q', '').strip()
     
-    if category and category != 'All':
+    # Build base query with search
+    if search_query:
+        search_pattern = f"%{search_query}%"
+        if category and category != 'All':
+            cur.execute("""
+                SELECT DISTINCT ON (p.id) p.*, ps.label as size_label
+                FROM products p
+                LEFT JOIN product_sizes ps ON p.id = ps.product_id
+                WHERE p.active = TRUE 
+                    AND p.category = %s
+                    AND (p.name ILIKE %s OR p.brand ILIKE %s OR p.description ILIKE %s)
+                ORDER BY p.id, p.created_at DESC
+                LIMIT 20
+            """, (category, search_pattern, search_pattern, search_pattern))
+        else:
+            cur.execute("""
+                SELECT DISTINCT ON (p.id) p.*, ps.label as size_label
+                FROM products p
+                LEFT JOIN product_sizes ps ON p.id = ps.product_id
+                WHERE p.active = TRUE 
+                    AND (p.name ILIKE %s OR p.brand ILIKE %s OR p.description ILIKE %s)
+                ORDER BY p.id, p.created_at DESC
+                LIMIT 20
+            """, (search_pattern, search_pattern, search_pattern))
+    elif category and category != 'All':
         cur.execute("""
             SELECT DISTINCT ON (p.id) p.*, ps.label as size_label
             FROM products p
@@ -487,7 +512,8 @@ def index():
         'index.html',
         products=products,
         current_category=category,
-        featured_products=featured_products
+        featured_products=featured_products,
+        search_query=search_query
     )
 
 
@@ -1137,6 +1163,46 @@ def admin_fetch_products():
     conn.close()
     
     return jsonify({'success': True, 'added': added_count})
+
+
+# =======================
+# Search API
+# =======================
+@app.route('/api/search/suggestions')
+def search_suggestions():
+    """Get search suggestions as user types"""
+    query = request.args.get('q', '').strip()
+    
+    if len(query) < 2:
+        return jsonify({'suggestions': []})
+    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    search_pattern = f"%{query}%"
+    cur.execute("""
+        SELECT DISTINCT ON (p.id) 
+            p.id, p.name, p.brand, p.base_price_cents, p.category, p.popularity_score
+        FROM products p
+        WHERE p.active = TRUE 
+            AND (p.name ILIKE %s OR p.brand ILIKE %s)
+        ORDER BY p.id, p.popularity_score DESC NULLS LAST
+        LIMIT 5
+    """, (search_pattern, search_pattern))
+    
+    products = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    suggestions = [{
+        'id': p['id'],
+        'name': p['name'],
+        'brand': p['brand'],
+        'price': p['base_price_cents'] / 100,
+        'category': p['category']
+    } for p in products]
+    
+    return jsonify({'suggestions': suggestions})
 
 
 # =======================
