@@ -24,16 +24,43 @@ header {
     display: flex; justify-content: space-between; align-items: center;
 }
 .logo a { font-size: 24px; font-weight: 900; font-style: italic; letter-spacing: -1px; }
+.logo-link { display: inline-flex; align-items: center; gap: 6px; }
+.logo-mark { width: 80px; height: 80px; object-fit: contain; display: inline-block; }
 
 .main-nav ul { display: flex; gap: 30px; }
 .main-nav a { font-size: 16px; font-weight: 700; color: #000; }
 .main-nav a:hover { opacity: 0.5; }
 .highlight a { color: #ff3b30; }
 
+.header-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #ddd;
+    padding: 4px 0;
+    min-width: 260px;
+}
+.search-input {
+    border: none;
+    outline: none;
+    font-size: 14px;
+    width: 200px;
+    background: transparent;
+}
+.search-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #555;
+    display: flex;
+    align-items: center;
+}
+
 .user-menu { display: flex; align-items: center; gap: 20px; font-size: 13px; font-weight: 500; }
 .menu-item { color: #555; }
 .menu-item:hover { color: #000; }
 .welcome-msg { font-weight: 700; }
+.menu-icon { font-size: 16px; }
 
 /* =========================================
    3. 메인 페이지 (Main Page)
@@ -60,6 +87,85 @@ header {
     margin-top: 20px; font-size: 14px;
 }
 .btn-hero:hover { background: #000; color: #fff; }
+
+/* =========================================
+   3-1. Hero Carousel
+   ========================================= */
+.hero-carousel {
+    position: relative;
+    width: 100%;
+    height: 480px;
+    overflow: hidden;
+}
+.carousel-track {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+.carousel-slide {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    display: flex;
+    align-items: center;
+}
+.carousel-slide.is-active { opacity: 1; }
+.carousel-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0) 100%);
+}
+.carousel-content {
+    position: relative;
+    z-index: 2;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 40px;
+    color: #fff;
+}
+.carousel-kicker {
+    display: inline-block;
+    font-size: 12px;
+    letter-spacing: 2px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.12);
+    padding: 6px 10px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+}
+.carousel-content h1 {
+    font-size: 44px;
+    font-weight: 900;
+    margin-bottom: 12px;
+    line-height: 1.15;
+}
+.carousel-sub {
+    font-size: 14px;
+    color: #ddd;
+    margin-bottom: 18px;
+}
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    border: none;
+    background: rgba(0,0,0,0.4);
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.carousel-btn.prev { left: 18px; }
+.carousel-btn.next { right: 18px; }
+.carousel-btn:hover { background: rgba(0,0,0,0.6); }
 
 .category-shortcut {
     display: flex; justify-content: center; gap: 30px; margin-bottom: 60px;
@@ -430,6 +536,45 @@ header {
 .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 20px auto; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 #result-area img { max-width: 100%; margin-top: 20px; border-radius: 8px; }
+
+.progress-wrap {
+    width: 100%;
+    height: 8px;
+    background: #eee;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 12px;
+}
+.progress-bar {
+    width: 0%;
+    height: 100%;
+    background: #000;
+    transition: width 0.3s ease;
+}
+.progress-text {
+    font-size: 12px;
+    color: #666;
+    margin-top: 8px;
+    text-align: center;
+}
+.ai-loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.ai-loading-card {
+    background: #fff;
+    padding: 28px;
+    border-radius: 12px;
+    width: min(360px, 90%);
+    text-align: center;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+}
+.ai-loading-card p { color: #666; margin-top: 10px; }
 
 footer { border-top: 1px solid #eee; padding: 40px 0; margin-top: 50px; color: #888; font-size: 12px; }
 .footer-inner { max-width: 1400px; margin: 0 auto; padding: 0 20px; }

@@ -1,6 +1,37 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% if featured_products|length > 0 %}
+<section class="hero-carousel" data-interval="4000">
+    <button class="carousel-btn prev" type="button" aria-label="Previous slide">
+        <span class="material-symbols-outlined">chevron_left</span>
+    </button>
+    <button class="carousel-btn next" type="button" aria-label="Next slide">
+        <span class="material-symbols-outlined">chevron_right</span>
+    </button>
+    <div class="carousel-track">
+        {% for product in featured_products %}
+        <article class="carousel-slide{% if loop.first %} is-active{% endif %}" style="background-image: url('/product_image/{{ product.id }}');">
+            <div class="carousel-overlay"></div>
+            <div class="carousel-content">
+                {% if loop.index0 % 3 == 0 %}
+                    <span class="carousel-kicker">NEW ARRIVAL</span>
+                    <h1>Fresh drop for standout walks</h1>
+                {% elif loop.index0 % 3 == 1 %}
+                    <span class="carousel-kicker">25% SALE</span>
+                    <h1>Season-ready styles, limited run</h1>
+                {% else %}
+                    <span class="carousel-kicker">BEST PICK</span>
+                    <h1>Fan favorites you can trust</h1>
+                {% endif %}
+                <p class="carousel-sub">Featured: {{ product.name }} by {{ product.brand }}</p>
+                <button class="btn-hero" onclick="location.href='/product/{{ product.id }}'">SHOP NOW &rarr;</button>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% else %}
 <section class="hero-banner">
     <div class="hero-content">
         <span class="hero-subtitle">2025 NEW COLLECTION</span>
@@ -9,6 +40,7 @@
         <button class="btn-hero" onclick="location.href='/?category=All'">SHOP NOW &rarr;</button>
     </div>
 </section>
+{% endif %}
 
 <div class="container">
     <div class="category-shortcut">

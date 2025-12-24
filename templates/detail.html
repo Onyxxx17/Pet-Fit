@@ -104,6 +104,17 @@
     </div>
 </div>
 
+<div id="ai-loading-overlay" class="ai-loading-overlay" style="display:none;">
+    <div class="ai-loading-card">
+        <div class="spinner"></div>
+        <p>Generating AI image... 🧶</p>
+        <div class="progress-wrap">
+            <div id="detail-progress-bar" class="progress-bar"></div>
+        </div>
+        <p id="detail-progress-text" class="progress-text">0%</p>
+    </div>
+</div>
+
 <script>
 function showPetSelector() {
     document.getElementById('pet-selector-modal').style.display = 'flex';
@@ -118,6 +129,38 @@ function tryAIFitting(petId) {
         closePetSelector();
     }
     
+    const loadingOverlay = document.getElementById('ai-loading-overlay');
+    const detailProgressBar = document.getElementById('detail-progress-bar');
+    const detailProgressText = document.getElementById('detail-progress-text');
+    let detailTimer = null;
+
+    function startDetailProgress() {
+        if (!detailProgressBar || !detailProgressText) return;
+        let value = 6;
+        detailProgressBar.style.width = value + "%";
+        detailProgressText.textContent = value + "%";
+        detailTimer = setInterval(() => {
+            value = Math.min(90, value + Math.floor(Math.random() * 6) + 2);
+            detailProgressBar.style.width = value + "%";
+            detailProgressText.textContent = value + "%";
+        }, 450);
+    }
+
+    function stopDetailProgress() {
+        if (!detailProgressBar || !detailProgressText) return;
+        if (detailTimer) {
+            clearInterval(detailTimer);
+            detailTimer = null;
+        }
+        detailProgressBar.style.width = "100%";
+        detailProgressText.textContent = "100%";
+    }
+
+    if (loadingOverlay) {
+        loadingOverlay.style.display = "flex";
+        startDetailProgress();
+    }
+
     // Show loading state
     const aiBtns = document.querySelectorAll('.btn-ai');
     aiBtns.forEach(btn => {
@@ -162,6 +205,10 @@ function tryAIFitting(petId) {
         alert('Error generating AI image. Please try again.');
     })
     .finally(() => {
+        if (loadingOverlay) {
+            stopDetailProgress();
+            loadingOverlay.style.display = "none";
+        }
         aiBtns.forEach(btn => {
             btn.innerHTML = '🤖 Try AI Virtual Fitting';
             btn.disabled = false;

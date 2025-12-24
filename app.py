@@ -434,6 +434,7 @@ def index():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
     category = request.args.get('category')
+    sort = request.args.get('sort')
     
     if category and category != 'All':
         cur.execute("""
@@ -445,16 +446,36 @@ def index():
             LIMIT 20
         """, (category,))
     else:
-        cur.execute("""
-            SELECT DISTINCT ON (p.id) p.*, ps.label as size_label
-            FROM products p
-            LEFT JOIN product_sizes ps ON p.id = ps.product_id
-            WHERE p.active = TRUE
-            ORDER BY p.id, p.created_at DESC
-            LIMIT 20
-        """)
+        if sort == 'best':
+            cur.execute("""
+                SELECT DISTINCT ON (p.id) p.*, ps.label as size_label
+                FROM products p
+                LEFT JOIN product_sizes ps ON p.id = ps.product_id
+                WHERE p.active = TRUE
+                ORDER BY p.id, p.popularity_score DESC NULLS LAST, p.created_at DESC
+                LIMIT 20
+            """)
+        else:
+            cur.execute("""
+                SELECT DISTINCT ON (p.id) p.*, ps.label as size_label
+                FROM products p
+                LEFT JOIN product_sizes ps ON p.id = ps.product_id
+                WHERE p.active = TRUE
+                ORDER BY p.id, p.created_at DESC
+                LIMIT 20
+            """)
     
     products = cur.fetchall()
+
+    cur.execute("""
+        SELECT p.id, p.name, p.brand
+        FROM products p
+        WHERE p.active = TRUE
+        ORDER BY p.created_at DESC
+        LIMIT 5
+    """)
+    featured_products = cur.fetchall()
+
     cur.close()
     conn.close()
     
@@ -462,7 +483,12 @@ def index():
     for p in products:
         p['price'] = p['base_price_cents'] / 100
     
-    return render_template('index.html', products=products, current_category=category)
+    return render_template(
+        'index.html',
+        products=products,
+        current_category=category,
+        featured_products=featured_products
+    )
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -541,7 +567,7 @@ def login():
 
 
 @app.route('/logout')
-def logout():
+def logout():   
     """User logout"""
     session.clear()
     flash('Logged out successfully', 'success')

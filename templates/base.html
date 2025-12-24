@@ -3,42 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PETINSA - Global Pet Fashion</title>
+    <title>SNAPET - Global Pet Fashion</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@300;400;500&display=swap" rel="stylesheet">
 </head>
 <body>
     <header>
         <div class="header-inner">
             <div class="logo">
-                <a href="/">PETINSA</a>
+                <a href="/" class="logo-link">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="SNAPET logo" class="logo-mark">
+                    <span>SNAPET</span>
+                </a>
             </div>
             
             <nav class="main-nav">
                 <ul>
-                    <li><a href="/?category=All">All</a></li>
-                    <li><a href="/?category=Top">Tops</a></li>
-                    <li><a href="/?category=Outer">Outerwear</a></li>
-                    <li><a href="/?category=Dress">Dresses</a></li>
-                    <li><a href="/?category=Harness%26Leash">Harness & Leash</a></li>
-                    <li><a href="/?category=Accessory">Accessories</a></li>
-                    <li><a href="/recommendations">Recommend Me</a></li>
-                    <li class="highlight"><a href="#" id="ai-btn-nav">AI Fitting 🔥</a></li>
+                    <li><a href="/">Welcome</a></li>
+                    <li><a href="/?sort=best">Best</a></li>
+                    <li><a href="/?sort=new">New</a></li>
+                    <li class="highlight"><a href="/recommendations">AI Recommend 🔥</a></li>
                 </ul>
             </nav>
 
+            <form class="header-search" action="/" method="GET">
+                <input type="text" name="q" class="search-input" placeholder="Search products" aria-label="Search products">
+                <button type="submit" class="search-btn" aria-label="Search">
+                    <span class="material-symbols-outlined">search</span>
+                </button>
+            </form>
+
             <div class="user-menu">
                 <button id="currency-toggle" class="btn-currency">$ USD</button>
-
                 {% if session.user_id %}
-                    <span class="welcome-msg">Hello, {{ session.username }}</span>
-                    <a href="/mypage" class="menu-item">My Page</a>
+                    <a href="/mypage" class="menu-item menu-icon" aria-label="My Page" title="My Page">
+                        <span class="material-symbols-outlined">person</span>
+                    </a>
                     <a href="/logout" class="menu-item">Logout</a>
                 {% else %}
                     <a href="/login" class="menu-item">Login</a>
                     <a href="/register" class="menu-item">Register</a>
                 {% endif %}
-                <a href="/cart" class="menu-item">Cart</a>
+                <a href="/cart" class="menu-item menu-icon" aria-label="Cart" title="Cart">
+                    <span class="material-symbols-outlined">shopping_cart</span>
+                </a>
             </div>
         </div>
     </header>
@@ -55,6 +64,10 @@
             <div id="loading-spinner" style="display:none; margin: 30px 0;">
                 <div class="spinner"></div>
                 <p style="margin-top:15px; color:#666;">AI is tailoring the outfit for your dog... 🧶</p>
+                <div class="progress-wrap">
+                    <div id="ai-progress-bar" class="progress-bar"></div>
+                </div>
+                <p id="ai-progress-text" class="progress-text">0%</p>
             </div>
 
             <div id="pet-select-area" class="pet-select-area" style="display:none;">
@@ -115,7 +128,7 @@
 
     <footer>
         <div class="footer-inner">
-            <p class="footer-logo">PETINSA</p>
+            <p class="footer-logo">SNAPET</p>
             <p>Copyright © 2025 PETINSA All rights reserved.</p>
         </div>
     </footer>

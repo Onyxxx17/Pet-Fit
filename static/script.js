@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeBtn = document.getElementsByClassName('close-btn')[0];
     const loading = document.getElementById('loading-spinner');
     const resultArea = document.getElementById('result-area');
+    const progressBar = document.getElementById('ai-progress-bar');
+    const progressText = document.getElementById('ai-progress-text');
+    let progressTimer = null;
     const petSelectArea = document.getElementById('pet-select-area');
     const petSelectCards = document.querySelectorAll('.pet-select-card');
     const petSelectStartBtn = document.getElementById('pet-select-start');
@@ -63,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultArea.innerHTML = ''; 
         uploadPrompt.style.display = "none"; 
         loading.style.display = "none";
+        stopProgress();
         if (petSelectArea) {
             petSelectArea.style.display = "none";
         }
@@ -104,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // AI 요청 함수
     function requestAIFitting(file = null, breed = null, size = null, petId = null) {
         loading.style.display = "block";
+        startProgress();
         uploadPrompt.style.display = "none";
         if (petSelectArea) {
             petSelectArea.style.display = "none";
@@ -135,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.json())
         .then(data => {
             loading.style.display = "none";
+            stopProgress();
             
             if (data.error === 'login_required') {
                 alert('Login required!');
@@ -174,8 +180,32 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(err => {
             console.error(err);
             loading.style.display = "none";
+            stopProgress();
             alert('An error occurred during AI processing.');
         });
+    }
+
+    function startProgress() {
+        if (!progressBar || !progressText) return;
+        stopProgress();
+        let value = 6;
+        progressBar.style.width = value + "%";
+        progressText.textContent = value + "%";
+        progressTimer = setInterval(() => {
+            value = Math.min(90, value + Math.floor(Math.random() * 6) + 2);
+            progressBar.style.width = value + "%";
+            progressText.textContent = value + "%";
+        }, 450);
+    }
+
+    function stopProgress() {
+        if (!progressBar || !progressText) return;
+        if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
+        progressBar.style.width = "100%";
+        progressText.textContent = "100%";
     }
 
     function setupSizePicker(pickerEl, displayEl) {
@@ -256,5 +286,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 priceEl.textContent = "₩" + krwValue.toLocaleString();
             }
         });
+    }
+
+    // ==========================================
+    // [NEW] Hero Carousel
+    // ==========================================
+    const carousel = document.querySelector('.hero-carousel');
+    if (carousel) {
+        const slides = carousel.querySelectorAll('.carousel-slide');
+        const prevBtn = carousel.querySelector('.carousel-btn.prev');
+        const nextBtn = carousel.querySelector('.carousel-btn.next');
+        const intervalMs = parseInt(carousel.dataset.interval || '4000', 10);
+        let current = 0;
+        let timer = null;
+
+        function showSlide(index) {
+            if (slides.length === 0) return;
+            current = (index + slides.length) % slides.length;
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('is-active', i === current);
+            });
+        }
+
+        function startAuto() {
+            if (timer || slides.length < 2) return;
+            timer = setInterval(() => {
+                showSlide(current + 1);
+            }, intervalMs);
+        }
+
+        function stopAuto() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                stopAuto();
+                showSlide(current - 1);
+                startAuto();
+            });
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                stopAuto();
+                showSlide(current + 1);
+                startAuto();
+            });
+        }
+
+        carousel.addEventListener('mouseenter', stopAuto);
+        carousel.addEventListener('mouseleave', startAuto);
+
+        showSlide(0);
+        startAuto();
     }
 });
