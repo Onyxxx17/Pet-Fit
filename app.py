@@ -204,19 +204,43 @@ def calculate_fit_score(pet_chest, pet_back, pet_neck, product_chest, product_ba
     return fit_score
 
 
-def calculate_weather_score(current_season='all-season'):
+def calculate_weather_score(pet_weather_pref='all-season', product_weather_tag='all-season'):
     """
-    Calculate weather score.
-    For MVP, return neutral score. Can be enhanced with weather API.
+    Calculate weather score based on pet preference and product weather tag.
+    Perfect match = 1.0, all-season = 0.8, no match = 0.5
     """
+    if not pet_weather_pref or not product_weather_tag:
+        return 0.5
+    
+    # Perfect match
+    if pet_weather_pref == product_weather_tag:
+        return 1.0
+    
+    # All-season products work for everyone
+    if product_weather_tag == 'all-season' or pet_weather_pref == 'all-season':
+        return 0.8
+    
+    # No match
     return 0.5
 
 
-def calculate_style_score(product_style):
+def calculate_style_score(pet_style_pref='any', product_style='classic'):
     """
-    Calculate style score.
-    For MVP, return neutral score. Can be enhanced with user preferences.
+    Calculate style score based on pet preference and product style.
+    Perfect match = 1.0, 'any' preference = 0.7, no match = 0.5
     """
+    if not pet_style_pref or not product_style:
+        return 0.5
+    
+    # Pet owner doesn't care about style
+    if pet_style_pref == 'any':
+        return 0.7
+    
+    # Perfect match
+    if pet_style_pref == product_style:
+        return 1.0
+    
+    # No match
     return 0.5
 
 
@@ -328,6 +352,10 @@ def generate_recommendations(pet_id, top_n=3):
     # Calculate scores for each product-size combination
     scored_products = []
     
+    # Get pet preferences
+    pet_weather_pref = pet_data.get('weather_preference') or 'all-season'
+    pet_style_pref = pet_data.get('style_preference') or 'any'
+    
     for product in products:
         # Calculate individual scores
         fit_score = calculate_fit_score(
@@ -339,8 +367,8 @@ def generate_recommendations(pet_id, top_n=3):
             product['neck_cm']
         )
         
-        weather_score = calculate_weather_score()
-        style_score = calculate_style_score(product['style_tag'])
+        weather_score = calculate_weather_score(pet_weather_pref, product['weather_tag'])
+        style_score = calculate_style_score(pet_style_pref, product['style_tag'])
         price_score = calculate_price_score(product['base_price_cents'])
         popularity_score = calculate_popularity_score(product['popularity_score'])
         
@@ -584,10 +612,14 @@ def mypage():
     """, (session['user_id'],))
     pets = cur.fetchall()
     
+    # Get all breeds for the dropdown
+    cur.execute("SELECT * FROM breeds ORDER BY name")
+    breeds = cur.fetchall()
+    
     cur.close()
     conn.close()
     
-    return render_template('mypage.html', user=user, pets=pets)
+    return render_template('mypage.html', user=user, pets=pets, breeds=breeds)
 
 
 @app.route('/account/update', methods=['POST'])
@@ -656,6 +688,8 @@ def add_pet():
         breed_id = request.form.get('breed_id')
         weight_kg = request.form.get('weight_kg')
         size_label = request.form.get('size_label') or request.form.get('pet_size')
+        weather_pref = request.form.get('weather_preference') or 'all-season'
+        style_pref = request.form.get('style_preference') or 'any'
         
         # Handle image upload - store in database
         image_data = None
@@ -672,11 +706,12 @@ def add_pet():
         
         try:
             cur.execute("""
-                INSERT INTO pets (user_id, name, breed_id, weight_kg, size_label, image_data, image_mime_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO pets (user_id, name, breed_id, weight_kg, size_label, 
+                                  weather_preference, style_preference, image_data, image_mime_type)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (session['user_id'], name, breed_id or None, 
-                  weight_kg or None, size_label, 
+                  weight_kg or None, size_label, weather_pref, style_pref,
                   psycopg2.Binary(image_data) if image_data else None, 
                   mime_type))
             
@@ -726,6 +761,8 @@ def update_pet(pet_id):
     breed_id = request.form.get('breed_id')
     weight_kg = request.form.get('weight_kg')
     size_label = request.form.get('pet_size')
+    weather_pref = request.form.get('weather_preference')
+    style_pref = request.form.get('style_preference')
     
     if name:
         updates.append('name = %s')
@@ -739,6 +776,12 @@ def update_pet(pet_id):
     if size_label:
         updates.append('size_label = %s')
         params.append(size_label)
+    if weather_pref:
+        updates.append('weather_preference = %s')
+        params.append(weather_pref)
+    if style_pref:
+        updates.append('style_preference = %s')
+        params.append(style_pref)
     
     # Handle image - store in database
     if 'pet_image' in request.files:

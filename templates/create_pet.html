@@ -40,6 +40,28 @@
         </div>
         
         <div class="input-group">
+            <label class="input-label">Weather Preference</label>
+            <select name="weather_preference" class="input-field">
+                <option value="all-season" selected>All Season</option>
+                <option value="cold">Cold Weather</option>
+                <option value="warm">Warm Weather</option>
+                <option value="rain">Rainy Weather</option>
+            </select>
+            <small>We'll prioritize clothing suitable for this weather</small>
+        </div>
+        
+        <div class="input-group">
+            <label class="input-label">Style Preference</label>
+            <select name="style_preference" class="input-field">
+                <option value="any" selected>Any Style</option>
+                <option value="classic">Classic</option>
+                <option value="sport">Sport / Active</option>
+                <option value="street">Street / Fashion</option>
+            </select>
+            <small>Choose your pet's fashion style</small>
+        </div>
+        
+        <div class="input-group">
             <label class="input-label">Pet Photo</label>
             <input type="file" name="pet_image" class="input-field" accept="image/*">
             <small>Upload a photo for AI virtual try-on</small>

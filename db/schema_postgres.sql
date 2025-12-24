@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS pets (
     breed_id        BIGINT REFERENCES breeds(id) ON DELETE SET NULL,
     weight_kg       NUMERIC(6,2),
     size_label      TEXT CHECK (size_label IN ('XS','S','M','L','XL','XXL')),
+    weather_pref    TEXT CHECK (weather_pref IN ('all-season','cold','rain')),
+    style_pref      TEXT CHECK (style_pref IN ('classic','sport','street')),
+    price_range     TEXT CHECK (price_range IN ('budget','mid','premium')),
     image_data      BYTEA,
     image_mime_type TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -85,6 +85,13 @@
                             </div>
                         </div>
                         <div class="input-group">
+                            <label class="input-label">Preferences</label>
+                            <div class="input-field" style="background:#f9f9f9; cursor: default;">
+                                🌤️ Weather: {{ pet.weather_preference|replace('-', ' ')|title or 'All Season' }} |
+                                ✨ Style: {{ pet.style_preference|title or 'Any' }}
+                            </div>
+                        </div>
+                        <div class="input-group">
                             {% if pet.image_data %}
                                 <img src="/pet_image/{{ pet.id }}" alt="Pet photo" style="width:100%; border-radius:8px; border:1px solid #eee; margin-bottom: 15px;">
                             {% else %}
@@ -100,7 +107,9 @@
                                 <label class="input-label">Update Breed</label>
                                 <select name="breed_id" class="input-field">
                                     <option value="">Unknown Breed</option>
-                                    <!-- Breeds will need to be passed or fetched -->
+                                    {% for breed in breeds %}
+                                    <option value="{{ breed.id }}" {% if pet.breed_id == breed.id %}selected{% endif %}>{{ breed.name }} ({{ breed.size_label }})</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                             <div style="display: flex; gap: 10px;">
@@ -118,6 +127,26 @@
                                         <option value="L" {% if pet.size_label == 'L' %}selected{% endif %}>L</option>
                                         <option value="XL" {% if pet.size_label == 'XL' %}selected{% endif %}>XL</option>
                                         <option value="XXL" {% if pet.size_label == 'XXL' %}selected{% endif %}>XXL</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <div class="input-group" style="flex: 1;">
+                                    <label class="input-label">Weather Preference</label>
+                                    <select name="weather_preference" class="input-field">
+                                        <option value="all-season" {% if pet.weather_preference == 'all-season' %}selected{% endif %}>All Season</option>
+                                        <option value="cold" {% if pet.weather_preference == 'cold' %}selected{% endif %}>Cold</option>
+                                        <option value="warm" {% if pet.weather_preference == 'warm' %}selected{% endif %}>Warm</option>
+                                        <option value="rain" {% if pet.weather_preference == 'rain' %}selected{% endif %}>Rain</option>
+                                    </select>
+                                </div>
+                                <div class="input-group" style="flex: 1;">
+                                    <label class="input-label">Style Preference</label>
+                                    <select name="style_preference" class="input-field">
+                                        <option value="any" {% if pet.style_preference == 'any' %}selected{% endif %}>Any</option>
+                                        <option value="classic" {% if pet.style_preference == 'classic' %}selected{% endif %}>Classic</option>
+                                        <option value="sport" {% if pet.style_preference == 'sport' %}selected{% endif %}>Sport</option>
+                                        <option value="street" {% if pet.style_preference == 'street' %}selected{% endif %}>Street</option>
                                     </select>
                                 </div>
                             </div>
