@@ -317,7 +317,6 @@ def generate_recommendations(pet_id, top_n=3):
     cur.execute("""
         SELECT p.id as product_id, p.name, p.brand, p.category, p.description,
                p.base_price_cents, p.weather_tag, p.style_tag, p.popularity_score,
-               p.image_url,
                ps.id as size_id, ps.label as size_label, ps.chest_cm, ps.back_cm, ps.neck_cm
         FROM products p
         JOIN product_sizes ps ON p.id = ps.product_id
@@ -450,6 +449,10 @@ def register():
             flash('Username and password are required', 'error')
             return redirect(url_for('register'))
         
+        if len(password) < 6:
+            flash('Password must be at least 6 characters', 'error')
+            return redirect(url_for('register'))
+        
         conn = get_db()
         cur = conn.cursor()
         
@@ -460,14 +463,24 @@ def register():
                 (username, email, password_hash)
             )
             conn.commit()
+            cur.close()
+            conn.close()
             flash('Registration successful! Please login.', 'success')
             return redirect(url_for('login'))
         except psycopg2.IntegrityError:
             conn.rollback()
-            flash('Username or email already exists', 'error')
-        finally:
             cur.close()
             conn.close()
+            flash('Username or email already exists', 'error')
+            return redirect(url_for('register'))
+        except Exception as e:
+            conn.rollback()
+            cur.close()
+            conn.close()
+            flash(f'Registration failed: {str(e)}', 'error')
+            return redirect(url_for('register'))
+    
+    return render_template('register.html')
     
     return render_template('register.html')
 
@@ -1192,12 +1205,4 @@ def remove_from_cart(product_id):
 
 
 if __name__ == '__main__':
-    # Initialize database on startup
-    if DATABASE_URL and "postgresql" in DATABASE_URL:
-        try:
-            init_db()
-        except Exception as e:
-            print(f"Database initialization error: {e}")
-            print("Make sure DATABASE_URL is set correctly and db/schema_postgres.sql exists")
-    
     app.run(debug=True, host='0.0.0.0', port=5000)
