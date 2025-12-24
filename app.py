@@ -32,6 +32,7 @@ if not DATABASE_URL:
 NAVER_CLIENT_ID = os.environ.get('NAVER_CLIENT_ID', 'Js36ALdCTg6fZ8v8T78g')
 NAVER_CLIENT_SECRET = os.environ.get('NAVER_CLIENT_SECRET', 'vsvGv1iGyZ')
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '')
+GEMINI_IMAGE_MODEL = os.environ.get('GEMINI_IMAGE_MODEL', 'gemini-2.5-flash-image')
 
 gemini_client = None
 if GOOGLE_API_KEY and "AIza" in GOOGLE_API_KEY:
@@ -928,7 +929,9 @@ def fit_clothing():
     
     if gemini_client and product_image_url:
         try:
-            # Download product image
+            # Download product image (make relative URLs absolute)
+            if product_image_url.startswith('/'):
+                product_image_url = request.host_url.rstrip('/') + product_image_url
             product_response = requests.get(product_image_url, timeout=10)
             product_image_data = product_response.content
             
@@ -944,26 +947,30 @@ def fit_clothing():
             ]
             
             response = gemini_client.models.generate_content(
-                model='gemini-2.0-flash-exp',
+                model=GEMINI_IMAGE_MODEL,
                 contents=contents,
                 config=types.GenerateContentConfig(
                     response_modalities=["IMAGE"]
                 )
             )
-            
-            if response.candidates and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
+
+            parts = getattr(response, 'parts', None)
+            if not parts and response.candidates:
+                parts = response.candidates[0].content.parts
+
+            if parts:
+                for part in parts:
                     if part.inline_data:
                         image_bytes = part.inline_data.data
                         if isinstance(image_bytes, str):
                             image_bytes = base64.b64decode(image_bytes)
-                        
+
                         unique_filename = f"gemini_{uuid.uuid4().hex[:8]}.jpg"
                         save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                        
+
                         with open(save_path, "wb") as f:
                             f.write(image_bytes)
-                        
+
                         generated_image_url = f"/static/uploads/{unique_filename}"
                         break
         except Exception as e:
@@ -1144,7 +1151,7 @@ def add_to_cart(product_id):
     session.modified = True
     
     flash(f'Added {product["name"]} to cart.')
-    return redirect(url_for('cart'))
+    return redirect(url_for('cart'))    
 
 
 @app.route('/cart/update/<int:product_id>', methods=['POST'])
