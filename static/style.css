@@ -568,14 +568,15 @@ header {
 .btn-buy:hover { background: #333; }
 
 .btn-ai {
-    width: 100%; padding: 18px; border: none; border-radius: 4px;
-    background: linear-gradient(96deg, #7b2cbf, #3a86ff);
-    color: #fff; font-weight: 700; font-size: 16px; cursor: pointer;
-    box-shadow: 0 4px 15px rgba(123, 44, 191, 0.3);
-    transition: transform 0.2s;
+    width: 100%; padding: 18px; border: none; border-radius: 999px;
+    background: #1c1c1c;
+    color: #fff; font-weight: 700; font-size: 15px; cursor: pointer;
+    letter-spacing: 0.3px; text-transform: uppercase;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
-.btn-ai:hover { transform: scale(1.02); }
-.ai-msg { text-align: center; font-size: 12px; color: #7b2cbf; margin-top: 8px; font-weight: 600; }
+.btn-ai:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(0,0,0,0.16); }
+.ai-msg { text-align: center; font-size: 12px; color: #666; margin-top: 8px; font-weight: 600; }
 
 /* =========================================
    6. 모달 & 푸터 & 반응형
@@ -629,6 +630,157 @@ header {
     box-shadow: 0 12px 30px rgba(0,0,0,0.2);
 }
 .ai-loading-card p { color: #666; margin-top: 10px; }
+.ai-wait-recos { margin-top: 18px; }
+.ai-wait-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #888;
+    margin-bottom: 10px;
+}
+.ai-wait-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+.ai-wait-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fafafa;
+}
+.ai-wait-card img {
+    width: 100%;
+    height: 72px;
+    object-fit: cover;
+    display: block;
+}
+.ai-wait-info {
+    padding: 6px;
+    text-align: left;
+}
+.ai-wait-name {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #222;
+}
+.ai-wait-brand {
+    display: block;
+    font-size: 10px;
+    color: #777;
+    margin-top: 2px;
+}
+
+.ai-confirm-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 2200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.ai-confirm-card {
+    background: #fff;
+    border-radius: 14px;
+    width: min(360px, 90%);
+    padding: 24px;
+    text-align: center;
+    box-shadow: 0 16px 30px rgba(0,0,0,0.18);
+}
+.ai-confirm-card h3 {
+    font-size: 18px;
+    margin-bottom: 8px;
+}
+.ai-confirm-card p {
+    color: #666;
+    margin-bottom: 16px;
+}
+.ai-confirm-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+}
+.ai-confirm-actions button {
+    width: 160px;
+    height: 48px;
+    padding: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+.ai-confirm-actions .btn-black,
+.ai-confirm-actions .btn-outline {
+    margin-top: 0;
+}
+.ai-confirm-actions .btn-black {
+    border: 1px solid #000;
+}
+
+.ai-result-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 2200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.ai-result-card {
+    background: #fff;
+    border-radius: 16px;
+    max-width: 560px;
+    width: 100%;
+    padding: 26px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    text-align: center;
+}
+.ai-result-card::before {
+    content: "";
+    display: block;
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #111, #666);
+    margin-bottom: 18px;
+}
+.ai-result-header p {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #888;
+}
+.ai-result-header h3 {
+    font-size: 26px;
+    margin: 6px 0 18px;
+    letter-spacing: -0.3px;
+}
+.ai-result-media img {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid #eee;
+}
+.ai-result-actions {
+    margin-top: 18px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+.ai-result-actions .btn-black,
+.ai-result-actions .btn-outline {
+    width: 140px;
+    height: 48px;
+    padding: 0 16px;
+    margin-top: 0;
+}
 
 footer { border-top: 1px solid #eee; padding: 40px 0; margin-top: 50px; color: #888; font-size: 12px; }
 .footer-inner { max-width: 1400px; margin: 0 auto; padding: 0 20px; }

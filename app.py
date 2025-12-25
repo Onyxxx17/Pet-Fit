@@ -998,12 +998,28 @@ def product_detail(product_id):
                         best_size = size['label']
                 
                 recommended_size = best_size
+
+        # Quick recommendations for AI loading overlay
+        cur.execute("""
+            SELECT id, name, brand
+            FROM products
+            WHERE active = TRUE AND id <> %s
+            ORDER BY (category = %s) DESC, created_at DESC
+            LIMIT 3
+        """, (product_id, product['category']))
+        preview_products = cur.fetchall()
     
     cur.close()
     conn.close()
     
-    return render_template('detail.html', product=product, recommended_size=recommended_size, 
-                         user_pets=user_pets, selected_pet=selected_pet)
+    return render_template(
+        'detail.html',
+        product=product,
+        recommended_size=recommended_size,
+        user_pets=user_pets,
+        selected_pet=selected_pet,
+        preview_products=preview_products if product else []
+    )
 
 
 @app.route('/api/fit_clothing', methods=['POST'])
