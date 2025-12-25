@@ -341,7 +341,8 @@ def generate_recommendations(pet_id, top_n=3):
     cur.execute("""
         SELECT p.id as product_id, p.name, p.brand, p.category, p.description,
                p.base_price_cents, p.weather_tag, p.style_tag, p.popularity_score,
-               ps.id as size_id, ps.label as size_label, ps.chest_cm, ps.back_cm, ps.neck_cm
+               ps.id as size_id, ps.label as size_label, ps.chest_cm, ps.back_cm, ps.neck_cm,
+               ps.weight_min_kg, ps.weight_max_kg
         FROM products p
         JOIN product_sizes ps ON p.id = ps.product_id
         WHERE p.active = TRUE
@@ -355,6 +356,7 @@ def generate_recommendations(pet_id, top_n=3):
     # Get pet preferences
     pet_weather_pref = pet_data.get('weather_preference') or 'all-season'
     pet_style_pref = pet_data.get('style_preference') or 'any'
+    pet_weight = pet_data.get('weight_kg')
     
     for product in products:
         # Calculate individual scores
@@ -366,6 +368,20 @@ def generate_recommendations(pet_id, top_n=3):
             product['back_cm'],
             product['neck_cm']
         )
+
+        # Weight-based fit boost for better per-pet differentiation
+        weight_score = 0.5
+        if pet_weight and (product.get('weight_min_kg') or product.get('weight_max_kg')):
+            min_w = float(product.get('weight_min_kg') or pet_weight)
+            max_w = float(product.get('weight_max_kg') or pet_weight)
+            pet_w = float(pet_weight)
+            if min_w <= pet_w <= max_w:
+                weight_score = 1.0
+            else:
+                band = max(1.0, max_w - min_w)
+                dist = min(abs(pet_w - min_w), abs(pet_w - max_w))
+                weight_score = max(0.1, 1 - (dist / band))
+        fit_score = (0.7 * fit_score) + (0.3 * weight_score)
         
         weather_score = calculate_weather_score(pet_weather_pref, product['weather_tag'])
         style_score = calculate_style_score(pet_style_pref, product['style_tag'])
@@ -401,9 +417,17 @@ def generate_recommendations(pet_id, top_n=3):
             'neck_cm': float(product['neck_cm']) if product['neck_cm'] else None
         })
     
-    # Sort by total score and get top N
+    # Sort by total score and get top N with unique categories
     scored_products.sort(key=lambda x: x['total_score'], reverse=True)
-    top_recommendations = scored_products[:top_n]
+    top_recommendations = []
+    seen_categories = set()
+    for rec in scored_products:
+        if rec['category'] in seen_categories:
+            continue
+        top_recommendations.append(rec)
+        seen_categories.add(rec['category'])
+        if len(top_recommendations) >= top_n:
+            break
     
     # Log recommendations
     user_id = pet_data['user_id']
