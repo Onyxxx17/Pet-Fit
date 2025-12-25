@@ -102,6 +102,47 @@
                 </div>
                 {% endif %}
             </div>
+
+            <!-- Size Chart -->
+            <div style="margin-top: 24px; padding: 20px; background: white; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">📏 Size Chart</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                            <tr style="background: #f8f9fa; text-align: left;">
+                                <th style="padding: 10px; border: 1px solid #dee2e6; font-weight: 600;">Size</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; font-weight: 600;">Chest</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; font-weight: 600;">Back</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; font-weight: 600;">Weight (kg)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for size in product.sizes %}
+                            <tr style="{% if size.label == recommended_size %}background: #e7f5e7;{% endif %}">
+                                <td style="padding: 10px; border: 1px solid #dee2e6; font-weight: 700;">
+                                    {{ size.label }}
+                                    {% if size.label == recommended_size %}
+                                    <span style="color: #4CAF50; margin-left: 4px; font-size: 11px;">✓</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6;">{{ size.chest_cm }}cm</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6;">{{ size.back_cm }}cm</td>
+                                <td style="padding: 10px; border: 1px solid #dee2e6;">
+                                    {% if size.weight_min_kg and size.weight_max_kg %}
+                                    {{ size.weight_min_kg }}-{{ size.weight_max_kg }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <p style="margin-top: 12px; font-size: 11px; color: #888; line-height: 1.4;">
+                    💡 Measure chest around widest part • Back from neck to tail base
+                </p>
+            </div>
         </div>
     </div>
 </div>
@@ -322,4 +363,6 @@ function downloadAIResult(imageUrl) {
         });
 }
 </script>
+
+
 {% endblock %}

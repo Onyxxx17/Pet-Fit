@@ -19,7 +19,7 @@
                         <img src="{{ item.image }}" alt="{{ item.name }}" onerror="this.src='https://via.placeholder.com/120x120?text=No+Image'">
                         <div class="cart-info">
                             <p class="cart-name">{{ item.name }}</p>
-                            <p class="cart-price">${{ item.price }}</p>
+                            <p class="cart-price"><span class="price-amount" data-usd="{{ item.price }}">${{ item.price }}</span></p>
                         </div>
                     </div>
                     <div class="cart-controls">
@@ -48,7 +48,7 @@
 
         <div class="cart-summary">
             <p>Total</p>
-            <span>${{ total }}</span>
+            <span class="price-amount" data-usd="{{ total }}">${{ total }}</span>
         </div>
         <button class="btn-black">Checkout</button>
     {% endif %}

@@ -264,11 +264,16 @@ document.addEventListener('DOMContentLoaded', () => {
             isUSD = !isUSD;
             updateCurrency();
         });
+        
+        // Initialize currency on page load
+        updateCurrency();
     }
 
     function updateCurrency() {
         const prices = document.querySelectorAll('.price-amount');
         const exchangeRate = 1300; // Example rate
+        
+        if (!currencyBtn) return;
 
         prices.forEach(priceEl => {
             const usdValue = parseFloat(priceEl.getAttribute('data-usd'));

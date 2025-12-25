@@ -81,7 +81,13 @@
                             <label class="input-label">{{ pet.name or 'My Pet' }}</label>
                             <div class="input-field" style="background:#f9f9f9; cursor: default;">
                                 Breed: {{ pet.breed_name or '-' }} | Size: {{ pet.size_label or '-' }}
-                                {% if pet.weight_kg %} | Weight: {{ pet.weight_kg }} kg{% endif %}
+                                {% if pet.neck_cm or pet.chest_cm or pet.back_cm %}
+                                <br><small style="color: #666;">📏 
+                                {% if pet.neck_cm %}Neck: {{ pet.neck_cm }}cm{% endif %}
+                                {% if pet.chest_cm %}{% if pet.neck_cm %} • {% endif %}Chest: {{ pet.chest_cm }}cm{% endif %}
+                                {% if pet.back_cm %}{% if pet.neck_cm or pet.chest_cm %} • {% endif %}Back: {{ pet.back_cm }}cm{% endif %}
+                                </small>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="input-group">
@@ -112,23 +118,35 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div style="display: flex; gap: 10px;">
-                                <div class="input-group" style="flex: 1;">
-                                    <label class="input-label">Weight (kg)</label>
-                                    <input type="number" step="0.1" name="weight_kg" class="input-field" value="{{ pet.weight_kg or '' }}" placeholder="e.g., 5.5">
+                            <div class="input-group">
+                                <label class="input-label">Pet Measurements (Optional)</label>
+                                <small style="margin-bottom: 8px; display: block; color: #888;">💡 Breed average will be used if left blank</small>
+                                <div style="display: flex; gap: 10px;">
+                                    <div style="flex: 1;">
+                                        <input type="number" step="0.1" name="neck_cm" class="input-field" value="{{ pet.neck_cm or '' }}" placeholder="Neck (cm)">
+                                        <small style="font-size: 11px; color: #888;">Around neck</small>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <input type="number" step="0.1" name="chest_cm" class="input-field" value="{{ pet.chest_cm or '' }}" placeholder="Chest (cm)">
+                                        <small style="font-size: 11px; color: #888;">Widest part</small>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <input type="number" step="0.1" name="back_cm" class="input-field" value="{{ pet.back_cm or '' }}" placeholder="Back (cm)">
+                                        <small style="font-size: 11px; color: #888;">Neck to tail</small>
+                                    </div>
                                 </div>
-                                <div class="input-group" style="flex: 1;">
-                                    <label class="input-label">Size</label>
-                                    <select name="pet_size" class="input-field">
-                                        <option value="">Auto</option>
-                                        <option value="XS" {% if pet.size_label == 'XS' %}selected{% endif %}>XS</option>
-                                        <option value="S" {% if pet.size_label == 'S' %}selected{% endif %}>S</option>
-                                        <option value="M" {% if pet.size_label == 'M' %}selected{% endif %}>M</option>
-                                        <option value="L" {% if pet.size_label == 'L' %}selected{% endif %}>L</option>
-                                        <option value="XL" {% if pet.size_label == 'XL' %}selected{% endif %}>XL</option>
-                                        <option value="XXL" {% if pet.size_label == 'XXL' %}selected{% endif %}>XXL</option>
-                                    </select>
-                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">Size</label>
+                                <select name="pet_size" class="input-field">
+                                    <option value="">Auto</option>
+                                    <option value="XS" {% if pet.size_label == 'XS' %}selected{% endif %}>XS</option>
+                                    <option value="S" {% if pet.size_label == 'S' %}selected{% endif %}>S</option>
+                                    <option value="M" {% if pet.size_label == 'M' %}selected{% endif %}>M</option>
+                                    <option value="L" {% if pet.size_label == 'L' %}selected{% endif %}>L</option>
+                                    <option value="XL" {% if pet.size_label == 'XL' %}selected{% endif %}>XL</option>
+                                    <option value="XXL" {% if pet.size_label == 'XXL' %}selected{% endif %}>XXL</option>
+                                </select>
                             </div>
                             <div style="display: flex; gap: 10px;">
                                 <div class="input-group" style="flex: 1;">

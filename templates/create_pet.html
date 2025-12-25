@@ -21,9 +21,22 @@
         </div>
         
         <div class="input-group">
-            <label class="input-label">Weight (kg)</label>
-            <input type="number" step="0.1" name="weight_kg" class="input-field" placeholder="e.g., 5.5">
-            <small>Optional - helps with size estimation</small>
+            <label class="input-label">Pet Measurements (Optional)</label>
+            <small style="margin-bottom: 8px; display: block;">💡 Average size of the dog breed will be used if no data is provided</small>
+            <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <div style="flex: 1;">
+                    <input type="number" step="0.1" name="neck_cm" class="input-field" placeholder="Neck (cm)">
+                    <small style="font-size: 11px;">Around neck</small>
+                </div>
+                <div style="flex: 1;">
+                    <input type="number" step="0.1" name="chest_cm" class="input-field" placeholder="Chest (cm)">
+                    <small style="font-size: 11px;">Widest part</small>
+                </div>
+                <div style="flex: 1;">
+                    <input type="number" step="0.1" name="back_cm" class="input-field" placeholder="Back (cm)">
+                    <small style="font-size: 11px;">Neck to tail</small>
+                </div>
+            </div>
         </div>
         
         <div class="input-group">
@@ -62,8 +75,8 @@
         </div>
         
         <div class="input-group">
-            <label class="input-label">Pet Photo</label>
-            <input type="file" name="pet_image" class="input-field" accept="image/*">
+            <label class="input-label">Pet Photo *</label>
+            <input type="file" name="pet_image" class="input-field" accept="image/*" required>
             <small>Upload a photo for AI virtual try-on</small>
         </div>
         
