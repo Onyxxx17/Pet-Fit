@@ -188,14 +188,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function startProgress() {
         if (!progressBar || !progressText) return;
         stopProgress();
-        let value = 6;
-        progressBar.style.width = value + "%";
-        progressText.textContent = value + "%";
+        const start = Date.now();
+        const rampMs = 24000;
+        const tailMs = 800;
+        let lastValue = 6;
         progressTimer = setInterval(() => {
-            value = Math.min(90, value + Math.floor(Math.random() * 6) + 2);
-            progressBar.style.width = value + "%";
-            progressText.textContent = value + "%";
-        }, 450);
+            const elapsed = Date.now() - start;
+            const ratio = Math.min(1, elapsed / rampMs);
+            const tailRatio = Math.min(1, Math.max(0, elapsed - rampMs) / tailMs);
+            const target = 6 + 84 * ratio + 8 * tailRatio;
+            const jitter = (Math.random() * 6) - 3;
+            const nextValue = Math.max(lastValue, Math.floor(target + jitter));
+            lastValue = Math.min(98, nextValue);
+            progressBar.style.width = lastValue + "%";
+            progressText.textContent = lastValue + "%";
+        }, 200);
     }
 
     function stopProgress() {

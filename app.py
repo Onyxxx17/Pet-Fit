@@ -264,50 +264,47 @@ def calculate_popularity_score(popularity):
 
 def get_pet_estimated_dimensions(pet_data, breed_data):
     """
-    Get pet dimensions - use actual measurements if provided, otherwise fall back to breed averages.
+    Estimate pet dimensions based on breed and weight.
     
-    Priority:
-    1. Use pet's actual measurements (neck_cm, chest_cm, back_cm) if provided
-    2. Fall back to breed average for missing measurements
-    3. Use defaults if breed data unavailable
+    Formula:
+    - If weight provided: estimated_size = avg_breed_size * (dog_weight / avg_breed_weight)
+    - If no weight: use average breed size
     """
     if not breed_data or not breed_data.get('avg_chest_cm'):
         # Default dimensions for unknown breed
         return {
-            'chest_cm': pet_data.get('chest_cm') or 40,
-            'back_cm': pet_data.get('back_cm') or 32,
-            'neck_cm': pet_data.get('neck_cm') or 28
+            'chest_cm': 40,
+            'back_cm': 32,
+            'neck_cm': 28
         }
     
     avg_chest = float(breed_data['avg_chest_cm'] or 40)
     avg_back = float(breed_data['avg_back_cm'] or 32)
     avg_neck = float(breed_data['avg_neck_cm'] or 28)
+    avg_weight = float(breed_data['avg_weight_kg'] or 5)
     
-    # Use pet's actual measurements if provided, otherwise use breed average
+    if pet_data.get('weight_kg'):
+        pet_weight = float(pet_data['weight_kg'])
+        weight_ratio = pet_weight / avg_weight
+        
+        estimated_chest = avg_chest * weight_ratio
+        estimated_back = avg_back * weight_ratio
+        estimated_neck = avg_neck * weight_ratio
+    else:
+        estimated_chest = avg_chest
+        estimated_back = avg_back
+        estimated_neck = avg_neck
+    
     return {
-        'chest_cm': float(pet_data['chest_cm']) if pet_data.get('chest_cm') else avg_chest,
-        'back_cm': float(pet_data['back_cm']) if pet_data.get('back_cm') else avg_back,
-        'neck_cm': float(pet_data['neck_cm']) if pet_data.get('neck_cm') else avg_neck
+        'chest_cm': estimated_chest,
+        'back_cm': estimated_back,
+        'neck_cm': estimated_neck
     }
 
 
 def generate_recommendations(pet_id, top_n=3):
     """
     Generate top N product recommendations for a pet using score-based formula.
-    
-    RECOMMENDATION ALGORITHM EXPLANATION (for judges/documentation):
-    Our AI-powered recommendation system uses a weighted scoring formula that considers five key factors 
-    to find the perfect fit for each pet. The algorithm calculates: Total Score = 55% Physical Fit + 
-    20% Weather Match + 15% Style Preference + 5% Price + 5% Popularity. Physical fit (55%) is the 
-    primary factor, comparing the pet's actual measurements (neck, chest, back length) - or breed 
-    averages if not provided - against product dimensions to ensure proper sizing. Weather matching 
-    (20%) aligns the pet's climate needs with appropriate clothing (e.g., warm coats for cold-weather 
-    dogs, breathable gear for warm climates). Style preference (15%) reflects the owner's fashion 
-    choices (classic, sport, or street style). Price optimization (5%) and popularity (5%) provide 
-    minor adjustments. This multi-factor approach ensures recommendations are not just trendy, but 
-    actually fit well and meet each pet's specific needs. The system is easily tunable - weights 
-    can be adjusted based on user feedback or seasonal trends, and new factors (like activity level 
-    or coat type) can be added by simply updating the scoring functions.
     
     Formula:
     total_score = 0.55*fit + 0.20*weather + 0.15*style + 0.05*price + 0.05*popularity
@@ -765,9 +762,7 @@ def add_pet():
     if request.method == 'POST':
         name = request.form.get('pet_name') or request.form.get('name')
         breed_id = request.form.get('breed_id')
-        neck_cm = request.form.get('neck_cm')
-        chest_cm = request.form.get('chest_cm')
-        back_cm = request.form.get('back_cm')
+        weight_kg = request.form.get('weight_kg')
         size_label = request.form.get('size_label') or request.form.get('pet_size')
         weather_pref = request.form.get('weather_preference') or 'all-season'
         style_pref = request.form.get('style_preference') or 'any'
@@ -787,13 +782,12 @@ def add_pet():
         
         try:
             cur.execute("""
-                INSERT INTO pets (user_id, name, breed_id, neck_cm, chest_cm, back_cm, size_label, 
+                INSERT INTO pets (user_id, name, breed_id, weight_kg, size_label, 
                                   weather_preference, style_preference, image_data, image_mime_type)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (session['user_id'], name, breed_id or None, 
-                  neck_cm or None, chest_cm or None, back_cm or None,
-                  size_label, weather_pref, style_pref,
+                  weight_kg or None, size_label, weather_pref, style_pref,
                   psycopg2.Binary(image_data) if image_data else None, 
                   mime_type))
             
@@ -841,9 +835,7 @@ def update_pet(pet_id):
     
     name = request.form.get('pet_name')
     breed_id = request.form.get('breed_id')
-    neck_cm = request.form.get('neck_cm')
-    chest_cm = request.form.get('chest_cm')
-    back_cm = request.form.get('back_cm')
+    weight_kg = request.form.get('weight_kg')
     size_label = request.form.get('pet_size')
     weather_pref = request.form.get('weather_preference')
     style_pref = request.form.get('style_preference')
@@ -854,15 +846,9 @@ def update_pet(pet_id):
     if breed_id:
         updates.append('breed_id = %s')
         params.append(breed_id)
-    if neck_cm is not None and neck_cm != '':
-        updates.append('neck_cm = %s')
-        params.append(neck_cm if neck_cm else None)
-    if chest_cm is not None and chest_cm != '':
-        updates.append('chest_cm = %s')
-        params.append(chest_cm if chest_cm else None)
-    if back_cm is not None and back_cm != '':
-        updates.append('back_cm = %s')
-        params.append(back_cm if back_cm else None)
+    if weight_kg:
+        updates.append('weight_kg = %s')
+        params.append(weight_kg)
     if size_label:
         updates.append('size_label = %s')
         params.append(size_label)

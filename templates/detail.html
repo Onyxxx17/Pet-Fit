@@ -245,15 +245,17 @@ function runAIFitting(petId, petName) {
     function startDetailProgress() {
         if (!detailProgressBar || !detailProgressText) return;
         const start = Date.now();
-        const rampMs = 13000;
+        const rampMs = 24000;
+        const tailMs = 800;
         let lastValue = 6;
         detailTimer = setInterval(() => {
             const elapsed = Date.now() - start;
             const ratio = Math.min(1, elapsed / rampMs);
-            const target = 6 + 84 * ratio;
+            const tailRatio = Math.min(1, Math.max(0, elapsed - rampMs) / tailMs);
+            const target = 6 + 84 * ratio + 8 * tailRatio;
             const jitter = (Math.random() * 6) - 3;
             const nextValue = Math.max(lastValue, Math.floor(target + jitter));
-            lastValue = Math.min(90, nextValue);
+            lastValue = Math.min(98, nextValue);
             detailProgressBar.style.width = lastValue + "%";
             detailProgressText.textContent = lastValue + "%";
         }, 200);
