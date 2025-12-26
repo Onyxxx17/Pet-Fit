@@ -71,37 +71,76 @@
             <div class="ai-section">
                 {% if user_pets|length == 0 %}
                 <p style="color: #888; font-size: 13px;">Add a pet profile to try AI virtual fitting</p>
-                {% elif user_pets|length == 1 %}
-                <button type="button" class="btn-ai" onclick="tryAIFitting({{ user_pets[0].id }}, '{{ user_pets[0].name|e }}')">
+                {% else %}
+                {% if user_pets|length == 1 %}
+                <button type="button" class="btn-ai" onclick="tryAIFitting({{ user_pets[0].id }})">
                     👕 Try AI Virtual Fitting with {{ user_pets[0].name }}
                 </button>
                 <p class="ai-msg">🔮 Try it on your dog with AI!</p>
                 {% else %}
-                <button type="button" class="btn-ai" onclick="showPetSelector()">
+                <button type="button" class="btn-ai" onclick="tryAIFitting()">
                     👕 Try AI Virtual Fitting
                 </button>
                 <p class="ai-msg">🔮 Choose a pet to try it on!</p>
-                <div id="pet-selector-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-                    <div style="background: white; padding: 24px; border-radius: 12px; max-width: 400px; width: 90%;">
-                        <h3 style="margin-bottom: 16px;">Choose a pet for AI fitting:</h3>
-                        {% for pet in user_pets %}
-                        <div onclick="tryAIFitting({{ pet.id }}, '{{ pet.name|e }}')" style="padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 8px; cursor: pointer; display: flex; align-items: center; gap: 12px;">
-                            {% if pet.image_data %}
-                            <img src="/pet_image/{{ pet.id }}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
-                            {% endif %}
-                            <div>
-                                <strong>{{ pet.name }}</strong><br>
-                                <small style="color: #888;">{{ pet.breed_name or 'Unknown breed' }}</small>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        <div class="ai-confirm-actions" style="margin-top: 12px;">
-                            <button class="btn-outline btn-large ai-cancel-btn" onclick="closePetSelector()">Cancel</button>
-                        </div>
-                    </div>
-                </div>
+                {% endif %}
                 {% endif %}
             </div>
+            {% if user_pets|length > 0 %}
+            <div id="pet-selector-modal" class="ai-setup-modal" style="display: none;">
+                <div class="ai-setup-card">
+                    <h3>Set up AI fitting</h3>
+                    <p class="ai-setup-subtitle">Pick a pet and your preferred vibe.</p>
+                    <div class="ai-setup-section">
+                        <p class="ai-setup-title">Choose a pet</p>
+                        <div class="ai-setup-pets">
+                            {% for pet in user_pets %}
+                            <button type="button" class="ai-pet-card" data-pet-id="{{ pet.id }}" data-pet-name="{{ pet.name|e }}">
+                                {% if pet.image_data %}
+                                <img src="/pet_image/{{ pet.id }}" alt="{{ pet.name }}">
+                                {% endif %}
+                                <div>
+                                    <strong>{{ pet.name }}</strong><br>
+                                    <small>{{ pet.breed_name or 'Unknown breed' }}</small>
+                                </div>
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="ai-setup-section">
+                        <p class="ai-setup-title">Background</p>
+                        <div class="ai-setup-options" data-group="background">
+                            <button type="button" class="ai-option is-active" data-value="original">Original</button>
+                            <button type="button" class="ai-option" data-value="studio">Studio</button>
+                            <button type="button" class="ai-option" data-value="park">Park</button>
+                            <button type="button" class="ai-option" data-value="snowy">Snowy</button>
+                            <button type="button" class="ai-option" data-value="rainy">Rainy</button>
+                        </div>
+                    </div>
+                    <div class="ai-setup-section">
+                        <p class="ai-setup-title">Weather</p>
+                        <div class="ai-setup-options is-disabled" data-group="weather">
+                            <button type="button" class="ai-option is-active" data-value="clear">Clear</button>
+                            <button type="button" class="ai-option" data-value="cloudy">Cloudy</button>
+                            <button type="button" class="ai-option" data-value="drizzle">Drizzle</button>
+                            <button type="button" class="ai-option" data-value="snowfall">Snowfall</button>
+                        </div>
+                    </div>
+                    <div class="ai-setup-section">
+                        <p class="ai-setup-title">Color tone</p>
+                        <div class="ai-setup-options is-disabled" data-group="tone">
+                            <button type="button" class="ai-option is-active" data-value="neutral">Neutral</button>
+                            <button type="button" class="ai-option" data-value="warm">Warm</button>
+                            <button type="button" class="ai-option" data-value="cool">Cool</button>
+                            <button type="button" class="ai-option" data-value="vivid">Vivid</button>
+                        </div>
+                    </div>
+                    <div class="ai-setup-actions">
+                        <button class="btn-black btn-large ai-action-btn" onclick="startAIFitting()">Start</button>
+                        <button class="btn-outline btn-large ai-action-btn" onclick="closePetSelector()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Size Chart -->
             <div style="margin-top: 24px; padding: 20px; background: white; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
@@ -174,61 +213,78 @@
     </div>
 </div>
 
-<div id="ai-confirm-modal" class="ai-confirm-modal" style="display:none;">
-    <div class="ai-confirm-card">
-        <h3>Confirm AI Fitting</h3>
-        <p id="ai-confirm-text">Start AI fitting?</p>
-        <div class="ai-confirm-actions">
-            <button class="btn-black btn-large ai-action-btn" onclick="confirmAIFitting()">Start</button>
-            <button class="btn-outline btn-large ai-action-btn" onclick="closeAIFittingConfirm()">Cancel</button>
-        </div>
-    </div>
-</div>
-
 <script>
 function showPetSelector() {
-    document.getElementById('pet-selector-modal').style.display = 'flex';
+    const modal = document.getElementById('pet-selector-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
 }
 
 function closePetSelector() {
-    document.getElementById('pet-selector-modal').style.display = 'none';
+    const modal = document.getElementById('pet-selector-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
-let pendingPetSelection = null;
+function syncOriginalMode() {
+    const background = document.querySelector('[data-group="background"] .ai-option.is-active')?.dataset.value;
+    const weatherGroup = document.querySelector('[data-group="weather"]');
+    const toneGroup = document.querySelector('[data-group="tone"]');
 
-function tryAIFitting(petId, petName) {
-    pendingPetSelection = { petId, petName };
-    openAIFittingConfirm(petName);
+    if (background === 'original') {
+        weatherGroup?.classList.add('is-disabled');
+        toneGroup?.classList.add('is-disabled');
+    } else {
+        weatherGroup?.classList.remove('is-disabled');
+        toneGroup?.classList.remove('is-disabled');
+    }
+}
+
+document.querySelectorAll('.ai-option').forEach(option => {
+    option.addEventListener('click', () => {
+        const group = option.closest('.ai-setup-options');
+        if (!group || group.classList.contains('is-disabled')) return;
+        group.querySelectorAll('.ai-option').forEach(btn => btn.classList.remove('is-active'));
+        option.classList.add('is-active');
+        if (group.dataset.group === 'background') {
+            syncOriginalMode();
+        }
+    });
+});
+
+syncOriginalMode();
+
+document.querySelectorAll('.ai-pet-card').forEach(card => {
+    card.addEventListener('click', () => {
+        document.querySelectorAll('.ai-pet-card').forEach(btn => btn.classList.remove('is-active'));
+        card.classList.add('is-active');
+    });
+});
+
+function tryAIFitting(petId) {
+    showPetSelector();
+    if (petId) {
+        const card = document.querySelector(`.ai-pet-card[data-pet-id="${petId}"]`);
+        if (card) {
+            document.querySelectorAll('.ai-pet-card').forEach(btn => btn.classList.remove('is-active'));
+            card.classList.add('is-active');
+        }
+    }
     return false;
 }
 
-function openAIFittingConfirm(petName) {
-    const confirmModal = document.getElementById('ai-confirm-modal');
-    const confirmText = document.getElementById('ai-confirm-text');
-    if (confirmText) {
-        const nameLabel = petName || 'this pet';
-        confirmText.textContent = `Start AI fitting for ${nameLabel}?`;
-    }
-    if (confirmModal) {
-        confirmModal.style.display = 'flex';
-    }
-}
-
-function closeAIFittingConfirm() {
-    const confirmModal = document.getElementById('ai-confirm-modal');
-    if (confirmModal) {
-        confirmModal.style.display = 'none';
-    }
-}
-
-function confirmAIFitting() {
-    if (!pendingPetSelection) {
-        closeAIFittingConfirm();
+function startAIFitting() {
+    const petCard = document.querySelector('.ai-pet-card.is-active');
+    if (!petCard) {
+        alert('Please select a pet first.');
         return;
     }
-    runAIFitting(pendingPetSelection.petId, pendingPetSelection.petName);
-    pendingPetSelection = null;
-    closeAIFittingConfirm();
+    const petId = petCard.dataset.petId;
+    const petName = petCard.dataset.petName;
+    closePetSelector();
+    runAIFitting(petId, petName);
 }
 
 function runAIFitting(petId, petName) {
@@ -279,6 +335,7 @@ function runAIFitting(petId, petName) {
         startDetailProgress();
     }
 
+
     // Show loading state
     const aiBtns = document.querySelectorAll('.btn-ai');
     aiBtns.forEach(btn => {
@@ -289,12 +346,22 @@ function runAIFitting(petId, petName) {
     // Get product info
     const productName = document.getElementById('product-name').textContent;
     const productImageUrl = document.getElementById('product-img').src;
+    const selectedBg = document.querySelector('[data-group="background"] .ai-option.is-active')?.dataset.value || 'studio';
+    let selectedWeather = document.querySelector('[data-group="weather"] .ai-option.is-active')?.dataset.value || 'clear';
+    let selectedTone = document.querySelector('[data-group="tone"] .ai-option.is-active')?.dataset.value || 'neutral';
+    if (selectedBg === 'original') {
+        selectedWeather = 'clear';
+        selectedTone = 'neutral';
+    }
     
     // Call the AI fitting API
     const formData = new FormData();
     formData.append('pet_id', petId);
     formData.append('product_name', productName);
     formData.append('product_image_url', productImageUrl);
+    formData.append('background', selectedBg);
+    formData.append('weather', selectedWeather);
+    formData.append('tone', selectedTone);
     
     fetch('/api/fit_clothing', {
         method: 'POST',

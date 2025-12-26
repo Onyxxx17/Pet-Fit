@@ -1055,6 +1055,9 @@ def fit_clothing():
     product_name = request.form.get('product_name', 'Stylish Dog Clothes')
     product_image_url = request.form.get('product_image_url')
     pet_id = request.form.get('pet_id')
+    background = request.form.get('background', 'studio')
+    weather = request.form.get('weather', 'clear')
+    tone = request.form.get('tone', 'neutral')
     
     if not pet_id:
         return jsonify({'error': 'Pet ID required'}), 400
@@ -1083,8 +1086,36 @@ def fit_clothing():
             product_response = requests.get(product_image_url, timeout=10)
             product_image_data = product_response.content
             
+            background_map = {
+                "original": "the original pet photo background and lighting",
+                "studio": "a clean studio backdrop with soft lighting",
+                "park": "a sunny park with greenery in the background",
+                "snowy": "a snowy outdoor scene with soft winter light",
+                "rainy": "a cozy rainy-day outdoor scene with muted tones"
+            }
+            weather_map = {
+                "clear": "clear skies and crisp daylight",
+                "cloudy": "soft overcast light",
+                "drizzle": "light rain with gentle reflections",
+                "snowfall": "falling snow with soft winter light"
+            }
+            tone_map = {
+                "neutral": "natural, true-to-life colors",
+                "warm": "warm, golden color grading",
+                "cool": "cool, clean color grading",
+                "vivid": "vibrant, punchy colors"
+            }
+            background_hint = background_map.get(background, background_map["studio"])
+            weather_hint = weather_map.get(weather, weather_map["clear"])
+            tone_hint = tone_map.get(tone, tone_map["neutral"])
+            if background == "original":
+                weather_hint = "match the original lighting conditions"
+                tone_hint = "preserve the original colors and tone"
+            elif background == "studio":
+                weather_hint = "soft, even studio lighting"
             prompt_text = (
-                f"Create a realistic photograph of this dog wearing the clothing item shown. "
+                f"Create a realistic photograph of this dog wearing the clothing item shown, "
+                f"set in {background_hint}. {weather_hint}. {tone_hint}. "
                 "Natural pose, high quality, detailed texture."
             )
             
